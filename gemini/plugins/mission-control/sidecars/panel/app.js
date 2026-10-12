@@ -1,31 +1,18 @@
-// Frontend Controller for Multi-Agent Mission Control
-// Supports both Antigravity Sidecar (window.sidecar) and Standalone Browser (http://localhost:4400)
+// Standalone Frontend Controller for Gemini Agent Mission Control
+// Only displays agents explicitly approved/enrolled by the user.
 
-const sidecar = window.sidecar || null;
 const $ = (id) => document.getElementById(id);
 
-let fleetData = { summary: {}, agents: [] };
+let fleetData = { summary: {}, agents: [], candidates: [] };
 let selectedAgentId = null;
 let activeFilter = 'all';
 let searchQuery = '';
 let toastTimer = null;
 
-// ---------------------------------------------------------------------------
-// API Helper (Works in both Antigravity Sidecar & Standalone Browser)
-// ---------------------------------------------------------------------------
-
 async function callApi(path, { method = 'GET', body } = {}) {
-  const fetcher =
-    sidecar && typeof sidecar.fetch === 'function'
-      ? (p, opts) => sidecar.fetch(p, opts)
-      : (p, opts) =>
-          fetch(p, {
-            ...opts,
-            headers: { 'Content-Type': 'application/json', ...(opts?.headers || {}) },
-          });
-
-  const res = await fetcher(path, {
+  const res = await fetch(path, {
     method,
+    headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -46,10 +33,6 @@ function toast(msg, isError = false) {
     el.hidden = true;
   }, 3200);
 }
-
-// ---------------------------------------------------------------------------
-// Time & Duration Formatting
-// ---------------------------------------------------------------------------
 
 function formatDurationSince(isoStr) {
   if (!isoStr) return '—';
@@ -113,16 +96,11 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// ---------------------------------------------------------------------------
-// Fleet Rendering
-// ---------------------------------------------------------------------------
-
 function getFilteredAgents() {
   return (fleetData.agents || []).filter((a) => {
     if (activeFilter === 'running' && a.status !== 'running') return false;
     if (activeFilter === 'pending_approval' && a.status !== 'pending_approval') return false;
-    if (activeFilter === 'gemini' && a.engine !== 'gemini') return false;
-    if (activeFilter === 'claude' && a.engine !== 'claude') return false;
+    if (activeFilter === 'stopped' && a.status !== 'stopped') return false;
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -147,7 +125,7 @@ function renderSummaryBar() {
   $('stat-total').textContent = s.total ?? 0;
   $('stat-running').textContent = s.running ?? 0;
   $('stat-approval').textContent = s.pendingApproval ?? 0;
-  $('stat-engines').textContent = `${s.geminiCount ?? 0} / ${s.claudeCount ?? 0}`;
+  $('candidate-count').textContent = s.candidateCount ?? 0;
 
   const approvalChip = $('stat-approval-chip');
   if (approvalChip) {
@@ -160,11 +138,16 @@ function renderAgentList() {
   const filtered = getFilteredAgents();
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="empty-state">No agents match the current filter.</div>`;
+    container.innerHTML = `
+      <div class="empty-state">
+        <p style="margin-bottom:8px;">No approved agents match this view.</p>
+        <button class="btn primary" onclick="document.getElementById('btn-enroll-drawer').click()">
+          ✓ Approve a Chat to Panel
+        </button>
+      </div>`;
     return;
   }
 
-  // Auto-select first agent if none selected
   if (!selectedAgentId || !fleetData.agents.some((a) => a.id === selectedAgentId)) {
     selectedAgentId = filtered[0].id;
   }
@@ -179,7 +162,7 @@ function renderAgentList() {
       return `
         <div class="agent-card ${isSelected ? 'selected' : ''} status-${escapeHtml(agent.status)}" data-agent-id="${escapeHtml(agent.id)}">
           <div class="agent-card-top">
-            <span class="engine-badge ${escapeHtml(agent.engine)}">${escapeHtml(agent.engineLabel)}</span>
+            <span class="engine-badge gemini">GEMINI • ${escapeHtml(agent.rawId.slice(0, 8))}</span>
             <span class="status-badge ${escapeHtml(agent.status)}">${statusLabel(agent.status)}</span>
           </div>
 
@@ -203,7 +186,7 @@ function renderAgentList() {
             <div class="card-quick-actions">
               ${
                 isRunning
-                  ? `<button class="btn-mini stop" data-quick-action="stop" data-agent-id="${escapeHtml(agent.id)}" data-pid="${agent.pid || ''}">■ Stop</button>`
+                  ? `<button class="btn-mini stop" data-quick-action="stop" data-agent-id="${escapeHtml(agent.id)}">■ Stop</button>`
                   : `<button class="btn-mini start" data-quick-action="start" data-agent-id="${escapeHtml(agent.id)}">▶ Start</button>`
               }
             </div>
@@ -213,11 +196,9 @@ function renderAgentList() {
     })
     .join('');
 
-  // Attach card selection and quick action listeners
   container.querySelectorAll('.agent-card').forEach((card) => {
     card.addEventListener('click', (e) => {
-      const quickBtn = e.target.closest('[data-quick-action]');
-      if (quickBtn) return;
+      if (e.target.closest('[data-quick-action]')) return;
       selectedAgentId = card.dataset.agentId;
       renderAgentList();
       renderInspector();
@@ -227,17 +208,46 @@ function renderAgentList() {
   container.querySelectorAll('[data-quick-action]').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const action = btn.dataset.quickAction;
-      const id = btn.dataset.agentId;
-      const pid = btn.dataset.pid ? Number(btn.dataset.pid) : null;
-      await triggerControl(action, { id, pid });
+      await triggerControl(btn.dataset.quickAction, { id: btn.dataset.agentId });
     });
   });
 }
 
-// ---------------------------------------------------------------------------
-// Deep-Dive Inspector Rendering
-// ---------------------------------------------------------------------------
+function renderCandidateModalList() {
+  const container = $('candidate-list');
+  const candidates = fleetData.candidates || [];
+  if (candidates.length === 0) {
+    container.innerHTML = `<div class="empty-state">All discovered Gemini chats are already approved on your panel!</div>`;
+    return;
+  }
+
+  container.innerHTML = candidates
+    .map(
+      (c) => `
+      <div class="work-item" style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="min-width:0;flex:1;">
+          <div class="work-item-top" style="margin-bottom:4px;">
+            <span class="work-tool-badge">Chat ${escapeHtml(c.rawId.slice(0, 8))}</span>
+            <span class="work-time">Started ${escapeHtml(formatDateTime(c.startedAt))} • Active ${escapeHtml(formatRelativeAgo(c.updatedAt))}</span>
+          </div>
+          <div class="work-summary" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.title)}</div>
+          <div class="work-detail">⚡ ${escapeHtml(c.currentAction)}</div>
+        </div>
+        <button class="btn primary" data-enroll-id="${escapeHtml(c.id)}">✓ Approve to Panel</button>
+      </div>
+    `
+    )
+    .join('');
+
+  container.querySelectorAll('[data-enroll-id]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.enrollId;
+      selectedAgentId = id;
+      await triggerControl('enroll_agent', { id });
+      renderCandidateModalList();
+    });
+  });
+}
 
 function renderInspector() {
   const agent = (fleetData.agents || []).find((a) => a.id === selectedAgentId);
@@ -250,51 +260,21 @@ function renderInspector() {
   $('inspector-empty').hidden = true;
   $('inspector-content').hidden = false;
 
-  // Badges
-  const engBadge = $('insp-engine-badge');
-  engBadge.textContent = agent.engineLabel;
-  engBadge.className = `engine-badge ${agent.engine}`;
-
   const stBadge = $('insp-status-badge');
   stBadge.textContent = statusLabel(agent.status);
   stBadge.className = `status-badge ${agent.status}`;
 
-  const pidBadge = $('insp-pid-badge');
-  if (agent.pid) {
-    pidBadge.hidden = false;
-    pidBadge.textContent = `PID: ${agent.pid}`;
-  } else {
-    pidBadge.hidden = true;
-  }
-
-  const costBadge = $('insp-cost-badge');
-  if (agent.costUSD) {
-    costBadge.hidden = false;
-    costBadge.textContent = `Session Cost: ${agent.costUSD}`;
-  } else {
-    costBadge.hidden = true;
-  }
-
-  // Control buttons
   $('btn-insp-approve').hidden = agent.status !== 'pending_approval';
-  const jumpBtn = $('btn-insp-jump');
-  if (sidecar && sidecar.ui && agent.engine === 'gemini') {
-    jumpBtn.hidden = false;
-  } else {
-    jumpBtn.hidden = true;
-  }
 
-  // Titles & Role
   $('insp-title').textContent = agent.title;
   $('insp-role').textContent = agent.role;
 
-  // Runtime Metadata
   $('insp-started-at').textContent = formatDateTime(agent.startedAt);
   $('insp-elapsed').textContent = `Running for ${formatDurationSince(agent.startedAt)}`;
   $('insp-updated-at').textContent = `${formatRelativeAgo(agent.updatedAt)} (${formatDateTime(agent.updatedAt)})`;
   $('insp-steps').textContent = `${agent.totalSteps || 0} steps / tool actions logged`;
   $('insp-workspace').textContent = agent.workspace || '—';
-  $('insp-session-id').textContent = `ID: ${agent.rawId}`;
+  $('insp-session-id').textContent = `Chat ID: ${agent.rawId}`;
 
   const skillsWrap = $('insp-skills');
   if (Array.isArray(agent.activeSkills) && agent.activeSkills.length > 0) {
@@ -311,7 +291,7 @@ function renderInspector() {
     approvalBanner.hidden = false;
     const pa = agent.pendingApproval || {
       title: 'Waiting for Your Approval',
-      description: 'This agent is flagged as waiting for your confirmation before proceeding.',
+      description: 'This agent is paused waiting for your confirmation.',
       options: [],
     };
     $('approval-title').textContent = pa.title;
@@ -325,7 +305,7 @@ function renderInspector() {
         )
         .join('');
       optsContainer.querySelectorAll('.approval-opt-btn').forEach((b) => {
-        b.addEventListener('click', () => approveWithOption(agent, b.dataset.opt));
+        b.addEventListener('click', () => triggerControl('approve', { id: agent.id }));
       });
     } else {
       optsContainer.innerHTML = '';
@@ -334,15 +314,13 @@ function renderInspector() {
     approvalBanner.hidden = true;
   }
 
-  // Live Action & Thinking
   $('insp-current-action').textContent = agent.currentAction || 'Idle';
   $('insp-thinking').textContent =
     agent.currentThinking ||
     (agent.status === 'running'
-      ? 'Executing tool step and monitoring output...'
+      ? 'Executing browser/tool steps and streaming telemetry...'
       : 'Agent is idle or waiting for your next instruction.');
 
-  // Job & Prompt
   $('insp-job-desc').textContent = agent.jobDescription || agent.initialGoal || '—';
   $('insp-latest-prompt').textContent = agent.latestPrompt || agent.initialGoal || '—';
 
@@ -404,7 +382,7 @@ function renderInspector() {
   $('work-count-pill').textContent = `${work.length} recent actions`;
   const workContainer = $('work-timeline');
   if (work.length === 0) {
-    workContainer.innerHTML = `<div class="empty-state">No tool calls recorded in the current transcript slice yet.</div>`;
+    workContainer.innerHTML = `<div class="empty-state">No tool calls recorded yet.</div>`;
   } else {
     workContainer.innerHTML = work
       .map(
@@ -423,10 +401,6 @@ function renderInspector() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Actions & Controls
-// ---------------------------------------------------------------------------
-
 async function triggerControl(action, payload = {}) {
   try {
     const res = await callApi('/api/control', {
@@ -440,33 +414,21 @@ async function triggerControl(action, payload = {}) {
   }
 }
 
-async function approveWithOption(agent, optionText) {
-  await triggerControl('approve', { id: agent.id });
-  if (sidecar && sidecar.agent && agent.engine === 'gemini') {
-    try {
-      await sidecar.agent.sendMessage(optionText || 'Approved. Please proceed.', agent.rawId);
-      toast(`Sent "${optionText}" to Gemini chat`);
-    } catch {}
-  }
-}
-
 async function refreshFleet() {
   try {
     fleetData = await callApi('/api/fleet');
     renderSummaryBar();
     renderAgentList();
     renderInspector();
+    if (!$('enroll-modal').hidden) {
+      renderCandidateModalList();
+    }
   } catch (err) {
     console.error('Failed to refresh fleet:', err);
   }
 }
 
-// ---------------------------------------------------------------------------
-// Event Wiring
-// ---------------------------------------------------------------------------
-
 function init() {
-  // Filter tabs
   $('filter-tabs').querySelectorAll('.filter-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       $('filter-tabs').querySelectorAll('.filter-tab').forEach((t) => t.classList.remove('active'));
@@ -476,40 +438,47 @@ function init() {
     });
   });
 
-  // Search box
   $('search-input').addEventListener('input', (e) => {
     searchQuery = e.target.value.trim();
     renderAgentList();
   });
 
-  // Top buttons
   $('btn-refresh').addEventListener('click', () => {
     refreshFleet();
-    toast('Fleet refreshed');
+    toast('Panel refreshed');
   });
 
-  // Inspector Start / Stop / Approve / Flag / Jump buttons
+  // Enroll / Approve Chat Modal
+  $('btn-enroll-drawer').addEventListener('click', () => {
+    renderCandidateModalList();
+    $('enroll-modal').hidden = false;
+  });
+
+  const closeEnroll = () => {
+    $('enroll-modal').hidden = true;
+  };
+  $('btn-close-enroll').addEventListener('click', closeEnroll);
+  $('btn-done-enroll').addEventListener('click', closeEnroll);
+
+  // Inspector controls
   $('btn-insp-start').addEventListener('click', () => {
     if (!selectedAgentId) return;
     triggerControl('start', { id: selectedAgentId });
   });
 
   $('btn-insp-stop').addEventListener('click', () => {
-    const agent = (fleetData.agents || []).find((a) => a.id === selectedAgentId);
-    if (!agent) return;
-    triggerControl('stop', { id: agent.id, pid: agent.pid });
+    if (!selectedAgentId) return;
+    triggerControl('stop', { id: selectedAgentId });
   });
 
   $('btn-insp-approve').addEventListener('click', () => {
-    const agent = (fleetData.agents || []).find((a) => a.id === selectedAgentId);
-    if (!agent) return;
-    approveWithOption(agent, 'Approved — please proceed.');
+    if (!selectedAgentId) return;
+    triggerControl('approve', { id: selectedAgentId });
   });
 
   $('btn-banner-approve').addEventListener('click', () => {
-    const agent = (fleetData.agents || []).find((a) => a.id === selectedAgentId);
-    if (!agent) return;
-    approveWithOption(agent, 'Approved — please proceed.');
+    if (!selectedAgentId) return;
+    triggerControl('approve', { id: selectedAgentId });
   });
 
   $('btn-insp-flag').addEventListener('click', () => {
@@ -517,11 +486,11 @@ function init() {
     triggerControl('flag_approval', { id: selectedAgentId });
   });
 
-  $('btn-insp-jump').addEventListener('click', () => {
-    const agent = (fleetData.agents || []).find((a) => a.id === selectedAgentId);
-    if (agent && sidecar && sidecar.ui) {
-      sidecar.ui.toggleConversation(agent.rawId);
-    }
+  $('btn-insp-remove').addEventListener('click', async () => {
+    if (!selectedAgentId) return;
+    const removedId = selectedAgentId;
+    selectedAgentId = null;
+    await triggerControl('unenroll_agent', { id: removedId });
   });
 
   // Role & Job Editor
@@ -563,28 +532,17 @@ function init() {
     if (e.key === 'Enter') addTodoHandler();
   });
 
-  // Send Instruction / Message to Agent
+  // Update Directive Bar
   const sendMessageHandler = async () => {
     const input = $('agent-message-input');
     const msg = input.value.trim();
-    const agent = (fleetData.agents || []).find((a) => a.id === selectedAgentId);
-    if (!msg || !agent) return;
+    if (!msg || !selectedAgentId) return;
     input.value = '';
-
     await triggerControl('update_meta', {
-      id: agent.id,
+      id: selectedAgentId,
       jobDescription: msg,
     });
-    await triggerControl('start', { id: agent.id });
-
-    if (sidecar && sidecar.agent && agent.engine === 'gemini') {
-      try {
-        await sidecar.agent.sendMessage(msg, agent.rawId);
-        toast('Sent instruction directly to Gemini conversation');
-        return;
-      } catch {}
-    }
-    toast('Updated agent directive & marked Running');
+    await triggerControl('start', { id: selectedAgentId });
   };
 
   $('btn-send-message').addEventListener('click', sendMessageHandler);
@@ -604,7 +562,6 @@ function init() {
   $('btn-cancel-new-agent').addEventListener('click', closeModal);
 
   $('btn-confirm-new-agent').addEventListener('click', async () => {
-    const engine = $('new-agent-engine').value;
     const title = $('new-agent-title').value.trim();
     const role = $('new-agent-role').value.trim();
     const workspace = $('new-agent-workspace').value.trim();
@@ -619,16 +576,9 @@ function init() {
       return;
     }
 
-    if (engine === 'gemini' && sidecar && sidecar.agent && prompt) {
-      try {
-        await sidecar.agent.startConversation(prompt);
-      } catch {}
-    }
-
     await triggerControl('launch_agent', {
-      engine,
       title: title || prompt.slice(0, 55),
-      role: role || 'Autonomous Specialist Agent',
+      role: role || 'Browser & Task Automation Agent',
       workspace,
       prompt: prompt || title,
       todos,

@@ -3,9 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agent Mission Control — Gemini &amp; Claude Fleet</title>
+  <title>Gemini Agent Mission Control</title>
   <link rel="stylesheet" href="/styles.css" />
-  <script src="/preload.js"></script>
 </head>
 <body>
   <div class="mc-shell">
@@ -17,16 +16,16 @@
         </div>
         <div>
           <div class="mc-title-row">
-            <h1>Agent Mission Control</h1>
-            <span id="live-indicator" class="live-pill">LIVE SYNC • 3s</span>
+            <h1>Gemini Agent Mission Control</h1>
+            <span id="live-indicator" class="live-pill">LIVE • APPROVED AGENTS ONLY</span>
           </div>
-          <p class="mc-subtitle">Unified Multi-Chat Command Center for Gemini (Antigravity) &amp; Claude</p>
+          <p class="mc-subtitle">Curated Multi-Chat Command Panel — Only Agents You Approve Appear Here</p>
         </div>
       </div>
 
       <div class="mc-stats">
         <div class="stat-chip">
-          <span class="stat-label">Total Fleet</span>
+          <span class="stat-label">Approved on Panel</span>
           <strong id="stat-total">0</strong>
         </div>
         <div class="stat-chip running">
@@ -37,49 +36,44 @@
           <span class="stat-label">Pending Approval</span>
           <strong id="stat-approval">0</strong>
         </div>
-        <div class="stat-chip">
-          <span class="stat-label">Gemini / Claude</span>
-          <strong id="stat-engines">0 / 0</strong>
-        </div>
       </div>
 
       <div class="mc-header-actions">
-        <button id="btn-new-agent" class="btn primary">+ New Agent Task</button>
-        <button id="btn-refresh" class="btn ghost" title="Refresh fleet now">↻ Refresh</button>
-        <a id="btn-open-browser" href="http://localhost:4400" target="_blank" rel="noopener" class="btn ghost" title="Open full-screen in browser">↗ Full Screen</a>
+        <button id="btn-enroll-drawer" class="btn primary">✓ Approve / Add Chat to Panel (<span id="candidate-count">0</span>)</button>
+        <button id="btn-new-agent" class="btn ghost">+ Register Custom Task</button>
+        <button id="btn-refresh" class="btn ghost" title="Refresh panel now">↻ Refresh</button>
       </div>
     </header>
 
-    <!-- Main Split Workspace: Left Fleet List + Right Deep-Dive Inspector -->
+    <!-- Main Split Workspace: Left Approved Agent List + Right Deep-Dive Inspector -->
     <div class="mc-main">
-      <!-- Left Column: Agent Fleet List -->
+      <!-- Left Column: Approved Agent Fleet List -->
       <aside class="mc-sidebar">
         <div class="mc-filter-bar">
           <div class="filter-tabs" id="filter-tabs">
-            <button class="filter-tab active" data-filter="all">All</button>
-            <button class="filter-tab" data-filter="pending_approval">🟡 Approval</button>
+            <button class="filter-tab active" data-filter="all">All Approved</button>
+            <button class="filter-tab" data-filter="pending_approval">🟡 Needs Approval</button>
             <button class="filter-tab" data-filter="running">🟢 Running</button>
-            <button class="filter-tab" data-filter="gemini">Gemini</button>
-            <button class="filter-tab" data-filter="claude">Claude</button>
+            <button class="filter-tab" data-filter="stopped">🛑 Stopped</button>
           </div>
           <input
             type="search"
             id="search-input"
             class="search-input"
-            placeholder="Filter by chat, project, role, or skill..."
+            placeholder="Search approved agents by task, role, or workspace..."
           />
         </div>
 
         <div id="agent-list" class="agent-list" role="list">
-          <div class="empty-state">Scanning local Gemini &amp; Claude sessions...</div>
+          <div class="empty-state">Loading your approved Gemini agents...</div>
         </div>
       </aside>
 
       <!-- Right Column: Selected Agent Inspector -->
       <main class="mc-inspector" id="inspector">
         <div id="inspector-empty" class="inspector-empty">
-          <h2>Select an Agent from the Fleet</h2>
-          <p>Click any Gemini or Claude agent on the left to inspect its live status, pending approvals, planned todo list, and completed work history.</p>
+          <h2>No Approved Agent Selected</h2>
+          <p>Click an approved agent on the left to inspect its live browser/task progress, or click <strong>"✓ Approve / Add Chat to Panel"</strong> in the top bar to choose which Gemini chats appear on this panel.</p>
         </div>
 
         <div id="inspector-content" class="inspector-content" hidden>
@@ -87,18 +81,16 @@
           <section class="inspector-header card">
             <div class="inspector-header-top">
               <div class="inspector-badges">
-                <span id="insp-engine-badge" class="engine-badge gemini">GEMINI</span>
+                <span id="insp-engine-badge" class="engine-badge gemini">GEMINI AGENT</span>
                 <span id="insp-status-badge" class="status-badge running">🟢 RUNNING</span>
-                <span id="insp-pid-badge" class="meta-pill" hidden>PID: —</span>
-                <span id="insp-cost-badge" class="meta-pill" hidden>$0.00</span>
               </div>
 
               <div class="inspector-controls">
-                <button id="btn-insp-approve" class="btn warning" hidden>✓ Approve Pending</button>
+                <button id="btn-insp-approve" class="btn warning" hidden>✓ Approve Pending Action</button>
                 <button id="btn-insp-start" class="btn success">▶ Start / Resume</button>
                 <button id="btn-insp-stop" class="btn danger">■ Stop Agent</button>
                 <button id="btn-insp-flag" class="btn ghost" title="Flag this agent as waiting for your approval">⚑ Flag Approval</button>
-                <button id="btn-insp-jump" class="btn ghost" hidden>↗ Switch to Chat</button>
+                <button id="btn-insp-remove" class="btn ghost" title="Remove this agent from Mission Control panel">✕ Remove from Panel</button>
               </div>
             </div>
 
@@ -106,12 +98,12 @@
               <h2 id="insp-title">Agent Title</h2>
               <div class="inspector-role-row">
                 <span class="role-label">Job / Role:</span>
-                <strong id="insp-role" class="role-value">Autonomous Engineer</strong>
+                <strong id="insp-role" class="role-value">Browser &amp; Task Automation Agent</strong>
                 <button id="btn-edit-role" class="btn-inline">✎ Edit Role &amp; Job</button>
               </div>
             </div>
 
-            <!-- Inline Role / Mission Editor (Hidden by default) -->
+            <!-- Inline Role / Mission Editor -->
             <div id="role-editor" class="role-editor" hidden>
               <div class="form-row">
                 <label>Display Title</label>
@@ -146,7 +138,7 @@
               <div class="meta-box">
                 <span class="meta-label">Workspace / Project</span>
                 <strong id="insp-workspace" class="mono">—</strong>
-                <span id="insp-session-id" class="meta-sub mono">ID: —</span>
+                <span id="insp-session-id" class="meta-sub mono">Chat ID: —</span>
               </div>
               <div class="meta-box">
                 <span class="meta-label">Active Skills</span>
@@ -155,7 +147,7 @@
             </div>
           </section>
 
-          <!-- Pending Approval Alert Box (Only visible when agent needs user approval) -->
+          <!-- Pending Approval Alert Box -->
           <section id="approval-banner" class="approval-banner card" hidden>
             <div class="approval-header">
               <div>
@@ -200,7 +192,6 @@
 
           <!-- Two-Column Lower: Planned Todo Queue + Work Completed Timeline -->
           <div class="inspector-two-col">
-            <!-- Planned Todo List -->
             <section class="card">
               <div class="section-header">
                 <div>
@@ -226,12 +217,11 @@
               <ul id="todo-list" class="todo-list"></ul>
             </section>
 
-            <!-- Work Completed So Far -->
             <section class="card">
               <div class="section-header">
                 <div>
                   <h3>✅ Work Completed Till Now</h3>
-                  <p class="section-sub">Live chronological history of tools, edits &amp; commands</p>
+                  <p class="section-sub">Live chronological history of browser actions, edits &amp; commands</p>
                 </div>
                 <span id="work-count-pill" class="meta-pill">0 actions</span>
               </div>
@@ -240,19 +230,19 @@
             </section>
           </div>
 
-          <!-- Direct Instruction / Command Bar -->
+          <!-- Update Directive Bar -->
           <section class="card command-bar">
             <div class="section-header">
-              <h3>💬 Send Instruction / Prompt to Agent</h3>
-              <span class="section-sub" id="send-hint">Updates agent directive &amp; dispatches message</span>
+              <h3>💬 Update Agent Directive / Note</h3>
+              <span class="section-sub">Updates the mission directive &amp; marks agent Running</span>
             </div>
             <div class="command-input-row">
               <input
                 type="text"
                 id="agent-message-input"
-                placeholder="Type next instruction, approval note, or task for this agent..."
+                placeholder="Type updated task directive or approval note for this agent..."
               />
-              <button id="btn-send-message" class="btn primary">Send &amp; Run ▶</button>
+              <button id="btn-send-message" class="btn primary">Save &amp; Run ▶</button>
             </div>
           </section>
         </div>
@@ -260,28 +250,38 @@
     </div>
   </div>
 
-  <!-- Modal: Launch / Register New Agent Task -->
+  <!-- Modal 1: Approve / Enroll Existing Gemini Chats onto Panel -->
+  <div id="enroll-modal" class="modal-backdrop" hidden>
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <div>
+          <h3>✓ Approve Gemini Chats to Mission Control Panel</h3>
+          <p class="section-sub">Only chats you approve below will appear on your main Mission Control board.</p>
+        </div>
+        <button id="btn-close-enroll" class="btn-inline">✕</button>
+      </div>
+      <div id="candidate-list" class="work-timeline" style="max-height: 420px;"></div>
+      <div class="modal-footer">
+        <button id="btn-done-enroll" class="btn primary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Register Custom Agent Mission -->
   <div id="new-agent-modal" class="modal-backdrop" hidden>
     <div class="modal-card">
       <div class="modal-header">
-        <h3>🚀 Launch / Register New Agent Mission</h3>
+        <h3>🚀 Approve &amp; Register New Gemini Agent Task</h3>
         <button id="btn-close-modal" class="btn-inline">✕</button>
       </div>
       <div class="modal-body">
         <div class="form-row">
-          <label>AI Engine</label>
-          <select id="new-agent-engine">
-            <option value="gemini">Gemini (Antigravity Session)</option>
-            <option value="claude">Claude Code (Background CLI Agent)</option>
-          </select>
-        </div>
-        <div class="form-row">
           <label>Agent Title</label>
-          <input type="text" id="new-agent-title" placeholder="e.g., Programmatic SEO Route Builder" />
+          <input type="text" id="new-agent-title" placeholder="e.g., Reddit &amp; Pinterest Browser Seeding Agent" />
         </div>
         <div class="form-row">
           <label>Role / Job Title</label>
-          <input type="text" id="new-agent-role" placeholder="e.g., SEO &amp; Content Engineer" />
+          <input type="text" id="new-agent-role" placeholder="e.g., Browser Automation &amp; Growth Operator" />
         </div>
         <div class="form-row">
           <label>Workspace Directory</label>
@@ -289,16 +289,16 @@
         </div>
         <div class="form-row">
           <label>Mission Prompt / Job Instructions</label>
-          <textarea id="new-agent-prompt" rows="3" placeholder="Describe what this agent should build or research..."></textarea>
+          <textarea id="new-agent-prompt" rows="3" placeholder="Describe what this agent is handling..."></textarea>
         </div>
         <div class="form-row">
           <label>Planned Todo Checklist (one per line)</label>
-          <textarea id="new-agent-todos" rows="3" placeholder="Research target keywords&#10;Generate route templates&#10;Run vitest suite"></textarea>
+          <textarea id="new-agent-todos" rows="3" placeholder="Open browser and verify target URLs&#10;Draft submission copy&#10;Pause for user approval before posting"></textarea>
         </div>
       </div>
       <div class="modal-footer">
         <button id="btn-cancel-new-agent" class="btn ghost">Cancel</button>
-        <button id="btn-confirm-new-agent" class="btn primary">Launch Agent ▶</button>
+        <button id="btn-confirm-new-agent" class="btn primary">Approve &amp; Add to Panel ▶</button>
       </div>
     </div>
   </div>

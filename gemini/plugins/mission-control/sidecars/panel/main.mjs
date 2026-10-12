@@ -1,5 +1,7 @@
-// Multi-Agent Mission Control Backend (Hybrid Antigravity Sidecar + Standalone http://localhost:4400)
-// Zero external npm dependencies — runs on built-in Node.js modules + optional sidecar_sdk.
+// Standalone Gemini Agent Mission Control Server (http://localhost:4400)
+// - Zero Antigravity sidecar/plugin dependency (100% standalone Node.js + HTML panel)
+// - Tracks ONLY Gemini agents that the user has explicitly approved/enrolled onto the panel
+// - Provides a "Candidate Chats" drawer so the user can approve/enroll or remove any chat at will
 
 import {
   closeSync,
@@ -13,40 +15,36 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
-import { homedir, platform, release } from 'node:os';
+import { homedir, platform } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOME = homedir();
 const GEMINI_BRAIN_DIR = join(HOME, '.gemini', 'antigravity', 'brain');
-const CLAUDE_SESSIONS_DIR = join(HOME, '.claude', 'sessions');
-const CLAUDE_PROJECTS_DIR = join(HOME, '.claude', 'projects');
-
-const DATA_DIR =
-  process.env.ANTIGRAVITY_EXECUTABLE_DATA_DIR ||
-  join(HOME, '.gemini', 'antigravity', 'mission-control-data');
+const DATA_DIR = join(HOME, '.gemini', 'antigravity', 'mission-control-data');
 const STATE_FILE = join(DATA_DIR, 'mission-control-state.json');
-const STANDALONE_PORT = Number(process.env.MISSION_CONTROL_PORT || 4400);
+const PORT = Number(process.env.MISSION_CONTROL_PORT || 4400);
 const STARTED_AT = Date.now();
 
 // ---------------------------------------------------------------------------
-// Persistent State (Custom Roles, Planned Todos, Manual Start/Stop Overrides)
+// Persistent State (Enrolled/Approved Agent IDs, Custom Roles, Todos, Status)
 // ---------------------------------------------------------------------------
 
 function loadState() {
   if (!existsSync(STATE_FILE)) {
-    return { overrides: {}, customAgents: [] };
+    return { enrolledIds: [], overrides: {}, customAgents: [] };
   }
   try {
     const raw = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
     return {
+      enrolledIds: Array.isArray(raw.enrolledIds) ? raw.enrolledIds : [],
       overrides: raw.overrides || {},
       customAgents: Array.isArray(raw.customAgents) ? raw.customAgents : [],
     };
   } catch {
-    return { overrides: {}, customAgents: [] };
+    return { enrolledIds: [], overrides: {}, customAgents: [] };
   }
 }
 
@@ -63,14 +61,16 @@ function getOverride(state, id) {
 }
 
 // ---------------------------------------------------------------------------
-// Fast File Head/Tail Reader for Large JSONL Transcripts
+// Fast JSONL Reader
 // ---------------------------------------------------------------------------
 
 function readJsonlHeadAndTail(filePath, headBytes = 32768, tailBytes = 131072) {
   try {
     const st = statSync(filePath);
     const size = st.size;
-    if (size === 0) return { headLines: [], tailLines: [], mtimeMs: st.mtimeMs, btimeMs: st.birthtimeMs || st.ctimeMs };
+    if (size === 0) {
+      return { headLines: [], tailLines: [], mtimeMs: st.mtimeMs, btimeMs: st.birthtimeMs || st.ctimeMs };
+    }
 
     const fd = openSync(filePath, 'r');
     try {
@@ -87,12 +87,12 @@ function readJsonlHeadAndTail(filePath, headBytes = 32768, tailBytes = 131072) {
       const hBuf = Buffer.alloc(headBytes);
       readSync(fd, hBuf, 0, headBytes, 0);
       const hRaw = hBuf.toString('utf8').split(/\r?\n/);
-      hRaw.pop(); // drop potentially truncated last line of head chunk
+      hRaw.pop();
 
       const tBuf = Buffer.alloc(tailBytes);
       readSync(fd, tBuf, 0, tailBytes, size - tailBytes);
       const tRaw = tBuf.toString('utf8').split(/\r?\n/);
-      tRaw.shift(); // drop potentially truncated first line of tail chunk
+      tRaw.shift();
 
       return {
         headLines: hRaw.filter((l) => l.trim().startsWith('{')),
@@ -113,16 +113,6 @@ function safeJsonParse(line) {
     return JSON.parse(line);
   } catch {
     return null;
-  }
-}
-
-function isPidAlive(pid) {
-  if (!pid || typeof pid !== 'number') return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return err && err.code === 'EPERM';
   }
 }
 
@@ -160,10 +150,10 @@ function parseMarkdownChecklist(mdContent) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Discover Gemini / Antigravity Sessions
+// Scan Gemini Sessions & Separate Enrolled vs Candidate Chats
 // ---------------------------------------------------------------------------
 
-function scanGeminiAgents(state) {
+function scanGeminiSessions(state) {
   if (!existsSync(GEMINI_BRAIN_DIR)) return [];
   let dirs = [];
   try {
@@ -182,16 +172,18 @@ function scanGeminiAgents(state) {
       })
       .filter((d) => d.mtimeMs > 0)
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
-      .slice(0, 20);
+      .slice(0, 25);
   } catch {
     return [];
   }
 
-  const agents = [];
+  const enrolledSet = new Set(state.enrolledIds || []);
+  const sessions = [];
 
   for (const dir of dirs) {
     const conversationId = dir.name;
     const agentId = `gemini:${conversationId}`;
+    const isEnrolled = enrolledSet.has(agentId) || enrolledSet.has(conversationId);
     const override = state.overrides[agentId] || {};
 
     const { headLines, tailLines, mtimeMs, btimeMs } = readJsonlHeadAndTail(dir.transcriptPath);
@@ -200,15 +192,14 @@ function scanGeminiAgents(state) {
     const headSteps = headLines.map(safeJsonParse).filter(Boolean);
     const tailSteps = tailLines.map(safeJsonParse).filter(Boolean);
 
-    // Dedup combined steps by step_index
     const stepMap = new Map();
     for (const s of [...headSteps, ...tailSteps]) {
       if (s && s.step_index !== undefined) stepMap.set(s.step_index, s);
     }
     const allSampledSteps = Array.from(stepMap.values()).sort((a, b) => a.step_index - b.step_index);
 
-    let startedAtIso = headSteps[0]?.created_at || new Date(btimeMs || mtimeMs).toISOString();
-    let updatedAtIso =
+    const startedAtIso = headSteps[0]?.created_at || new Date(btimeMs || mtimeMs).toISOString();
+    const updatedAtIso =
       tailSteps[tailSteps.length - 1]?.created_at || new Date(mtimeMs).toISOString();
 
     let initialPrompt = '';
@@ -220,7 +211,6 @@ function scanGeminiAgents(state) {
     const activeSkills = new Set();
     const workDone = [];
     let pendingApproval = null;
-    let lastPlannerStep = null;
 
     for (const step of allSampledSteps) {
       if (step.type === 'USER_INPUT' && step.content) {
@@ -237,12 +227,13 @@ function scanGeminiAgents(state) {
       }
 
       if (step.type === 'PLANNER_RESPONSE') {
-        lastPlannerStep = step;
         if (step.thinking) {
-          currentThinking = step.thinking.trim().slice(0, 360);
+          currentThinking = step.thinking.trim().slice(0, 380);
         }
         if (typeof step.content === 'string') {
-          const skillMatches = step.content.matchAll(/\*\*\[(?:Skill Active|New Skill Acquired[^:]*):\s*([^\]]+)\]\*\*/gi);
+          const skillMatches = step.content.matchAll(
+            /\*\*\[(?:Skill Active|New Skill Acquired[^:]*):\s*([^\]]+)\]\*\*/gi
+          );
           for (const m of skillMatches) {
             m[1]
               .replace(/`/g, '')
@@ -260,7 +251,6 @@ function scanGeminiAgents(state) {
             const action = args.toolAction || summary;
             currentAction = action;
 
-            // Detect workspace from tool paths
             const candidatePath = args.Cwd || args.TargetFile || args.AbsolutePath || '';
             if (!workspace && typeof candidatePath === 'string') {
               const projMatch = candidatePath.match(/^([a-zA-Z]:[\\/]+Projects[\\/]+[^\\/]+)/i);
@@ -269,8 +259,11 @@ function scanGeminiAgents(state) {
               }
             }
 
-            // Detect skill reads
-            if (tc.name === 'view_file' && typeof args.AbsolutePath === 'string' && args.AbsolutePath.includes('SKILL.md')) {
+            if (
+              tc.name === 'view_file' &&
+              typeof args.AbsolutePath === 'string' &&
+              args.AbsolutePath.includes('SKILL.md')
+            ) {
               const parts = args.AbsolutePath.replace(/\\/g, '/').split('/');
               const idx = parts.indexOf('skills');
               if (idx !== -1 && parts[idx + 1]) {
@@ -278,14 +271,13 @@ function scanGeminiAgents(state) {
               }
             }
 
-            // Record work completed item
             let detail = '';
             if (tc.name === 'write_to_file' || tc.name === 'replace_file_content') {
               detail = args.TargetFile ? basename(args.TargetFile) : '';
             } else if (tc.name === 'run_command') {
-              detail = args.CommandLine ? String(args.CommandLine).slice(0, 90) : '';
-            } else if (tc.name === 'search_web') {
-              detail = args.query ? `Query: "${args.query}"` : '';
+              detail = args.CommandLine ? String(args.CommandLine).slice(0, 100) : '';
+            } else if (tc.name === 'search_web' || tc.name === 'read_url_content') {
+              detail = args.query || args.Url || '';
             } else if (tc.name === 'view_file') {
               detail = args.AbsolutePath ? basename(args.AbsolutePath) : '';
             }
@@ -303,7 +295,6 @@ function scanGeminiAgents(state) {
       }
     }
 
-    // Check if the very last step in transcript is waiting for user approval (e.g., ask_question)
     const lastStep = tailSteps[tailSteps.length - 1];
     if (lastStep && lastStep.type === 'PLANNER_RESPONSE' && Array.isArray(lastStep.tool_calls)) {
       const askCall = lastStep.tool_calls.find((t) => t.name === 'ask_question');
@@ -312,10 +303,10 @@ function scanGeminiAgents(state) {
         const qText =
           Array.isArray(qList) && qList[0]?.question
             ? qList[0].question
-            : askCall.args?.toolSummary || 'Agent is waiting for your selection in the modal.';
+            : askCall.args?.toolSummary || 'Agent is waiting for your selection.';
         pendingApproval = {
           type: 'question',
-          title: 'Waiting for Your Decision / Selection',
+          title: 'Waiting for Your Decision / Approval',
           description: qText,
           options: Array.isArray(qList) && qList[0]?.options ? qList[0].options : [],
           since: lastStep.created_at || updatedAtIso,
@@ -323,43 +314,26 @@ function scanGeminiAgents(state) {
       }
     }
 
-    // Also check if the last assistant response explicitly asked for approval
     if (
       !pendingApproval &&
       lastStep &&
       lastStep.type === 'PLANNER_RESPONSE' &&
       !lastStep.tool_calls &&
       typeof lastStep.content === 'string' &&
-      /(?:approve|approval|confirm|shall i proceed|would you like me to|let me know if you want)/i.test(lastStep.content)
+      /(?:approve|approval|confirm|shall i proceed|would you like me to|explicit user approval)/i.test(
+        lastStep.content
+      )
     ) {
       pendingApproval = {
         type: 'confirmation',
-        title: 'Agent Requested Confirmation / Next Step',
+        title: 'Agent Requested Your Approval',
         description: lastStep.content.replace(/\*\*\[[^\]]+\]\*\*/g, '').trim().slice(-240),
-        options: ['Approve & Proceed', 'Pause'],
+        options: ['Approve & Proceed', 'Pause Agent'],
         since: lastStep.created_at || updatedAtIso,
       };
     }
 
-    // Check background tasks in .system_generated/tasks
-    const tasksDir = join(dir.fullPath, '.system_generated', 'tasks');
-    const bgTasks = [];
-    if (existsSync(tasksDir)) {
-      try {
-        const logFiles = readdirSync(tasksDir).filter((f) => f.endsWith('.log'));
-        for (const lf of logFiles) {
-          const lfStat = statSync(join(tasksDir, lf));
-          const isRecentTask = Date.now() - lfStat.mtimeMs < 10 * 60 * 1000;
-          bgTasks.push({
-            id: lf.replace('.log', ''),
-            active: isRecentTask,
-            updatedAt: new Date(lfStat.mtimeMs).toISOString(),
-          });
-        }
-      } catch {}
-    }
-
-    // Read task.md or implementation_plan.md if present in brain dir
+    // Check task.md / implementation_plan.md
     let artifactTodos = [];
     for (const candidateMd of ['task.md', 'implementation_plan.md', 'plan.md']) {
       const p = join(dir.fullPath, candidateMd);
@@ -371,7 +345,6 @@ function scanGeminiAgents(state) {
       }
     }
 
-    // If no task.md exists, derive milestone items from recent user requests + current step
     if (artifactTodos.length === 0 && userPrompts.length > 0) {
       const recentPrompts = userPrompts.slice(-5);
       artifactTodos = recentPrompts.map((up, idx) => {
@@ -386,11 +359,9 @@ function scanGeminiAgents(state) {
       });
     }
 
-    // Merge user-custom planned todos stored in Mission Control
     const customTodos = Array.isArray(override.todos) ? override.todos : [];
     const combinedTodos = [...customTodos, ...artifactTodos];
 
-    // Determine live status
     const ageMs = Date.now() - mtimeMs;
     const lastStepIsToolCallInFlight =
       lastStep &&
@@ -410,24 +381,25 @@ function scanGeminiAgents(state) {
     }
 
     const defaultTitle =
-      initialPrompt.slice(0, 68) || `Gemini Session ${conversationId.slice(0, 8)}`;
+      initialPrompt.slice(0, 68) || `Gemini Agent ${conversationId.slice(0, 8)}`;
     const defaultRole = workspace
-      ? `${basename(workspace)} Engineering Agent`
-      : 'Full-Stack & Skill-First Autonomous Agent';
+      ? `${basename(workspace)} Autonomous Agent`
+      : 'Browser & Task Automation Agent';
 
-    agents.push({
+    sessions.push({
       id: agentId,
       rawId: conversationId,
+      enrolled: isEnrolled,
       engine: 'gemini',
-      engineLabel: 'Gemini / Antigravity',
+      engineLabel: 'Gemini Agent',
       title: override.title || defaultTitle,
       role: override.role || defaultRole,
       jobDescription:
         override.jobDescription ||
         latestPrompt ||
         initialPrompt ||
-        'Autonomous pair-programming and domain skill execution.',
-      initialGoal: initialPrompt || 'Interactive coding session',
+        'Autonomous browser & task execution agent.',
+      initialGoal: initialPrompt || 'Interactive Gemini session',
       latestPrompt: latestPrompt || initialPrompt,
       workspace: workspace || 'c:\\Projects\\ring-size',
       status,
@@ -439,298 +411,56 @@ function scanGeminiAgents(state) {
         status === 'stopped'
           ? 'Stopped by user from Mission Control'
           : status === 'pending_approval'
-            ? pendingApproval?.title || 'Waiting for user approval'
+            ? pendingApproval?.title || 'Waiting for your approval'
             : currentAction,
       currentThinking,
       activeSkills: Array.from(activeSkills),
       plannedTodos: combinedTodos,
       workDone: workDone.slice(-25).reverse(),
       totalSteps: lastStep?.step_index || allSampledSteps.length,
-      bgTasks,
-      pid: null,
+      pid: override.pid || null,
     });
   }
 
-  return agents;
+  return sessions;
 }
 
 // ---------------------------------------------------------------------------
-// 2. Discover Claude Code / Desktop Sessions
-// ---------------------------------------------------------------------------
-
-function scanClaudeAgents(state) {
-  const sessionById = new Map();
-
-  // 1) Read live session files in ~/.claude/sessions/*.json
-  if (existsSync(CLAUDE_SESSIONS_DIR)) {
-    try {
-      const files = readdirSync(CLAUDE_SESSIONS_DIR).filter((f) => f.endsWith('.json'));
-      for (const file of files) {
-        try {
-          const data = JSON.parse(readFileSync(join(CLAUDE_SESSIONS_DIR, file), 'utf8'));
-          if (data && data.sessionId) {
-            sessionById.set(data.sessionId, {
-              ...data,
-              pidAlive: isPidAlive(data.pid),
-            });
-          }
-        } catch {}
-      }
-    } catch {}
-  }
-
-  // 2) Scan project JSONL transcripts in ~/.claude/projects/<proj>/<sessionId>.jsonl
-  const jsonlFiles = [];
-  if (existsSync(CLAUDE_PROJECTS_DIR)) {
-    try {
-      const projDirs = readdirSync(CLAUDE_PROJECTS_DIR, { withFileTypes: true }).filter((d) =>
-        d.isDirectory()
-      );
-      for (const pd of projDirs) {
-        const pdPath = join(CLAUDE_PROJECTS_DIR, pd.name);
-        const files = readdirSync(pdPath).filter((f) => f.endsWith('.jsonl'));
-        for (const f of files) {
-          const fp = join(pdPath, f);
-          try {
-            const st = statSync(fp);
-            jsonlFiles.push({
-              sessionId: f.replace('.jsonl', ''),
-              projectDirName: pd.name,
-              filePath: fp,
-              mtimeMs: st.mtimeMs,
-              btimeMs: st.birthtimeMs || st.ctimeMs,
-            });
-          } catch {}
-        }
-      }
-    } catch {}
-  }
-
-  jsonlFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  const topJsonl = jsonlFiles.slice(0, 15);
-  const seenSessionIds = new Set();
-  const agents = [];
-
-  for (const item of topJsonl) {
-    seenSessionIds.add(item.sessionId);
-    const liveSession = sessionById.get(item.sessionId) || null;
-    const agentId = `claude:${item.sessionId}`;
-    const override = state.overrides[agentId] || {};
-
-    const { headLines, tailLines, mtimeMs, btimeMs } = readJsonlHeadAndTail(item.filePath);
-    const headObjs = headLines.map(safeJsonParse).filter(Boolean);
-    const tailObjs = tailLines.map(safeJsonParse).filter(Boolean);
-    const combined = [...headObjs, ...tailObjs];
-
-    let cwd = liveSession?.cwd || override.workspace || '';
-    let gitBranch = 'main';
-    let initialPrompt = '';
-    let latestPrompt = '';
-    let startedAtMs = liveSession?.startedAt || btimeMs || mtimeMs;
-    let updatedAtMs = liveSession?.updatedAt || mtimeMs;
-    let totalCostUSD = 0;
-    let claudeTodos = [];
-    const workDone = [];
-    let currentAction = 'Idle / Ready';
-    let pendingApproval = null;
-
-    for (const entry of combined) {
-      if (entry.cwd && !cwd) cwd = entry.cwd;
-      if (entry.gitBranch) gitBranch = entry.gitBranch;
-      if (entry.timestamp) {
-        const ts = Date.parse(entry.timestamp);
-        if (!Number.isNaN(ts)) {
-          if (!startedAtMs || ts < startedAtMs) startedAtMs = ts;
-          if (ts > updatedAtMs) updatedAtMs = ts;
-        }
-      }
-      if (entry.type === 'cost-state' && typeof entry.totalCostUSD === 'number') {
-        totalCostUSD = entry.totalCostUSD;
-      }
-
-      if (entry.type === 'user' && entry.message?.content) {
-        const content =
-          typeof entry.message.content === 'string'
-            ? entry.message.content
-            : Array.isArray(entry.message.content)
-              ? entry.message.content
-                  .filter((b) => b.type === 'text')
-                  .map((b) => b.text)
-                  .join(' ')
-              : '';
-        const cleaned = content.trim();
-        if (cleaned && !cleaned.startsWith('[Request interrupted')) {
-          if (!initialPrompt) initialPrompt = cleaned;
-          latestPrompt = cleaned;
-        }
-      }
-
-      if (entry.type === 'assistant' && Array.isArray(entry.message?.content)) {
-        for (const block of entry.message.content) {
-          if (block.type === 'tool_use') {
-            const toolName = block.name || 'Tool';
-            const input = block.input || {};
-            let detail = '';
-            if (toolName === 'TodoWrite' && Array.isArray(input.todos)) {
-              claudeTodos = input.todos.map((t, i) => ({
-                id: t.id || `claude-todo-${i + 1}`,
-                text: t.content || t.text || '',
-                status: t.status || 'pending',
-                source: 'claude',
-              }));
-              detail = `Updated ${claudeTodos.length} planned todo items`;
-            } else if (toolName === 'Bash') {
-              detail = input.command ? String(input.command).slice(0, 90) : '';
-            } else if (toolName === 'Write' || toolName === 'Edit' || toolName === 'Read') {
-              detail = input.file_path ? basename(input.file_path) : '';
-            } else {
-              detail = input.description || input.pattern || '';
-            }
-
-            currentAction = `${toolName}${detail ? `: ${detail}` : ''}`;
-            workDone.push({
-              stepIndex: workDone.length + 1,
-              tool: toolName,
-              action: toolName,
-              summary: detail || toolName,
-              detail,
-              timestamp: entry.timestamp || new Date(updatedAtMs).toISOString(),
-            });
-          }
-        }
-      }
-    }
-
-    const pidAlive = Boolean(liveSession?.pidAlive);
-    const ageMs = Date.now() - updatedAtMs;
-
-    let status = 'idle';
-    if (override.status === 'stopped') {
-      status = 'stopped';
-    } else if (override.status === 'pending_approval' || liveSession?.status === 'waiting') {
-      status = 'pending_approval';
-      pendingApproval = {
-        type: 'permission',
-        title: 'Claude Waiting for Tool Permission / Input',
-        description: currentAction,
-        options: ['Approve', 'Stop Agent'],
-        since: new Date(updatedAtMs).toISOString(),
-      };
-    } else if (
-      override.status === 'running' ||
-      liveSession?.status === 'running' ||
-      (pidAlive && ageMs < 45000)
-    ) {
-      status = 'running';
-    }
-
-    const customTodos = Array.isArray(override.todos) ? override.todos : [];
-    const defaultTitle =
-      liveSession?.name ||
-      initialPrompt.slice(0, 68) ||
-      `Claude Session ${item.sessionId.slice(0, 8)}`;
-
-    agents.push({
-      id: agentId,
-      rawId: item.sessionId,
-      engine: 'claude',
-      engineLabel: liveSession?.entrypoint === 'claude-desktop' ? 'Claude Desktop' : 'Claude Code',
-      title: override.title || defaultTitle,
-      role:
-        override.role ||
-        (cwd ? `${basename(cwd)} Claude Specialist` : 'Claude Code Autonomous Agent'),
-      jobDescription:
-        override.jobDescription ||
-        latestPrompt ||
-        initialPrompt ||
-        liveSession?.name ||
-        'Claude autonomous coding & research session.',
-      initialGoal: initialPrompt || liveSession?.name || 'Claude session',
-      latestPrompt: latestPrompt || initialPrompt || liveSession?.name || '',
-      workspace: cwd || item.projectDirName.replace(/--/g, '\\'),
-      gitBranch,
-      status,
-      pendingApproval,
-      startedAt: new Date(startedAtMs).toISOString(),
-      updatedAt: new Date(updatedAtMs).toISOString(),
-      ageSeconds: Math.max(0, Math.round(ageMs / 1000)),
-      currentAction:
-        status === 'stopped'
-          ? 'Stopped by user from Mission Control'
-          : pidAlive
-            ? `${currentAction} (PID ${liveSession.pid} Live)`
-            : currentAction,
-      currentThinking: '',
-      activeSkills: ['skill-first-operator'],
-      plannedTodos: [...customTodos, ...claudeTodos],
-      workDone: workDone.slice(-25).reverse(),
-      totalSteps: workDone.length,
-      costUSD: totalCostUSD ? `$${totalCostUSD.toFixed(2)}` : null,
-      pid: pidAlive ? liveSession.pid : null,
-    });
-  }
-
-  // Also include any live session in ~/.claude/sessions/*.json that didn't have a project jsonl yet
-  for (const [sessionId, live] of sessionById.entries()) {
-    if (seenSessionIds.has(sessionId)) continue;
-    const agentId = `claude:${sessionId}`;
-    const override = state.overrides[agentId] || {};
-    agents.push({
-      id: agentId,
-      rawId: sessionId,
-      engine: 'claude',
-      engineLabel: 'Claude Desktop / CLI',
-      title: override.title || live.name || `Claude Session ${sessionId.slice(0, 8)}`,
-      role: override.role || `${basename(live.cwd || 'Workspace')} Claude Agent`,
-      jobDescription: override.jobDescription || live.name || 'Interactive Claude session',
-      initialGoal: live.name || 'Interactive Claude session',
-      latestPrompt: live.name || '',
-      workspace: live.cwd || HOME,
-      status:
-        override.status ||
-        (live.status === 'running' ? 'running' : live.pidAlive ? 'idle' : 'stopped'),
-      pendingApproval: null,
-      startedAt: new Date(live.startedAt || Date.now()).toISOString(),
-      updatedAt: new Date(live.updatedAt || Date.now()).toISOString(),
-      ageSeconds: Math.max(0, Math.round((Date.now() - (live.updatedAt || Date.now())) / 1000)),
-      currentAction: live.pidAlive ? `Connected (PID ${live.pid})` : 'Session idle',
-      currentThinking: '',
-      activeSkills: ['skill-first-operator'],
-      plannedTodos: Array.isArray(override.todos) ? override.todos : [],
-      workDone: [],
-      totalSteps: 0,
-      pid: live.pidAlive ? live.pid : null,
-    });
-  }
-
-  return agents;
-}
-
-// ---------------------------------------------------------------------------
-// 3. Combine & Rank All Fleet Agents
+// Fleet Snapshot (Separates Approved/Enrolled Agents vs Candidate Chats)
 // ---------------------------------------------------------------------------
 
 function getFleetSnapshot() {
   const state = loadState();
-  const geminiAgents = scanGeminiAgents(state);
-  const claudeAgents = scanClaudeAgents(state);
+  const allGemini = scanGeminiSessions(state);
+
+  // Auto-enroll current active chat ONLY if enrolledIds is completely empty on very first boot
+  // so the board isn't blank on first open, while keeping all other chats unenrolled until approved.
+  if (state.enrolledIds.length === 0 && state.customAgents.length === 0 && allGemini.length > 0) {
+    state.enrolledIds.push(allGemini[0].id);
+    allGemini[0].enrolled = true;
+    saveState(state);
+  }
+
   const customAgents = (state.customAgents || []).map((ca) => {
     const override = state.overrides[ca.id] || {};
-    const pidAlive = isPidAlive(ca.pid);
     return {
       ...ca,
       ...override,
-      pid: pidAlive ? ca.pid : null,
+      enrolled: true,
       plannedTodos: override.todos || ca.plannedTodos || [],
       workDone: ca.workDone || [],
     };
   });
 
-  const all = [...customAgents, ...geminiAgents, ...claudeAgents];
+  const enrolledAgents = [
+    ...customAgents,
+    ...allGemini.filter((a) => a.enrolled),
+  ];
 
-  // Sort: Pending Approval first, then Running, then by most recently updated
+  const candidateAgents = allGemini.filter((a) => !a.enrolled);
+
   const priority = { pending_approval: 0, running: 1, idle: 2, stopped: 3 };
-  all.sort((a, b) => {
+  enrolledAgents.sort((a, b) => {
     const pa = priority[a.status] ?? 2;
     const pb = priority[b.status] ?? 2;
     if (pa !== pb) return pa - pb;
@@ -738,28 +468,27 @@ function getFleetSnapshot() {
   });
 
   const summary = {
-    total: all.length,
-    running: all.filter((a) => a.status === 'running').length,
-    pendingApproval: all.filter((a) => a.status === 'pending_approval').length,
-    idle: all.filter((a) => a.status === 'idle').length,
-    stopped: all.filter((a) => a.status === 'stopped').length,
-    geminiCount: all.filter((a) => a.engine === 'gemini').length,
-    claudeCount: all.filter((a) => a.engine === 'claude').length,
+    total: enrolledAgents.length,
+    running: enrolledAgents.filter((a) => a.status === 'running').length,
+    pendingApproval: enrolledAgents.filter((a) => a.status === 'pending_approval').length,
+    idle: enrolledAgents.filter((a) => a.status === 'idle').length,
+    stopped: enrolledAgents.filter((a) => a.status === 'stopped').length,
+    candidateCount: candidateAgents.length,
     serverUptimeSeconds: Math.round((Date.now() - STARTED_AT) / 1000),
-    standaloneUrl: `http://localhost:${STANDALONE_PORT}`,
+    standaloneUrl: `http://localhost:${PORT}`,
   };
 
-  return { summary, agents: all };
+  return { summary, agents: enrolledAgents, candidates: candidateAgents };
 }
 
 // ---------------------------------------------------------------------------
-// 4. Control Actions (Stop Process, Start/Resume, Approve, Edit Plan/Todos)
+// Control Actions (Enroll/Approve to Panel, Remove, Start, Stop, Todos)
 // ---------------------------------------------------------------------------
 
 function killProcessByPid(pid) {
   return new Promise((resolve) => {
-    if (!pid || !isPidAlive(pid)) {
-      resolve({ killed: false, reason: 'Process not running' });
+    if (!pid) {
+      resolve({ killed: false });
       return;
     }
     if (platform() === 'win32') {
@@ -770,8 +499,8 @@ function killProcessByPid(pid) {
       try {
         process.kill(pid, 'SIGTERM');
         resolve({ killed: true, pid });
-      } catch (err) {
-        resolve({ killed: false, error: err.message });
+      } catch {
+        resolve({ killed: false });
       }
     }
   });
@@ -781,11 +510,43 @@ async function handleControlAction(data) {
   const state = loadState();
   const { action, id, pid } = data || {};
 
+  // Allow any chat or user to enroll/approve an agent onto the Mission Control panel
+  if (action === 'enroll_agent') {
+    const targetId = id.startsWith('gemini:') || id.startsWith('custom:') ? id : `gemini:${id}`;
+    if (!state.enrolledIds.includes(targetId)) {
+      state.enrolledIds.push(targetId);
+    }
+    const ov = getOverride(state, targetId);
+    if (data.title) ov.title = String(data.title).trim();
+    if (data.role) ov.role = String(data.role).trim();
+    if (data.jobDescription) ov.jobDescription = String(data.jobDescription).trim();
+    if (data.workspace) ov.workspace = String(data.workspace).trim();
+    if (Array.isArray(data.todos) && data.todos.length > 0) {
+      ov.todos = data.todos.map((t, i) => ({
+        id: `todo-${Date.now()}-${i}`,
+        text: typeof t === 'string' ? t : t.text || '',
+        status: typeof t === 'object' && t.status ? t.status : i === 0 ? 'in_progress' : 'pending',
+        source: 'custom',
+      }));
+    }
+    saveState(state);
+    return { ok: true, message: 'Agent approved and added to Mission Control panel.' };
+  }
+
+  // Remove an agent from the Mission Control panel
+  if (action === 'unenroll_agent') {
+    state.enrolledIds = (state.enrolledIds || []).filter(
+      (eid) => eid !== id && `gemini:${eid}` !== id
+    );
+    state.customAgents = (state.customAgents || []).filter((ca) => ca.id !== id);
+    saveState(state);
+    return { ok: true, message: 'Agent removed from Mission Control panel.' };
+  }
+
   if (action === 'launch_agent') {
     const newId = `custom:${Date.now()}`;
-    const engine = data.engine === 'claude' ? 'claude' : 'gemini';
     const workspace = data.workspace || 'c:\\Projects\\ring-size';
-    const prompt = data.prompt || data.jobDescription || 'Execute assigned mission tasks';
+    const prompt = data.prompt || data.jobDescription || 'Execute assigned browser & automation tasks';
     const todos = Array.isArray(data.todos)
       ? data.todos.map((t, i) => ({
           id: `todo-${Date.now()}-${i}`,
@@ -795,26 +556,14 @@ async function handleControlAction(data) {
         }))
       : [];
 
-    let spawnedPid = null;
-    if (engine === 'claude' && data.spawnProcess !== false) {
-      try {
-        const child = spawn('cmd.exe', ['/c', 'claude', '-p', prompt], {
-          cwd: existsSync(workspace) ? workspace : HOME,
-          detached: true,
-          stdio: 'ignore',
-        });
-        child.unref();
-        spawnedPid = child.pid || null;
-      } catch {}
-    }
-
     const newAgent = {
       id: newId,
       rawId: newId,
-      engine,
-      engineLabel: engine === 'claude' ? 'Claude Code' : 'Gemini / Antigravity',
+      enrolled: true,
+      engine: 'gemini',
+      engineLabel: 'Gemini Agent',
       title: data.title || prompt.slice(0, 60),
-      role: data.role || 'Autonomous Specialist Agent',
+      role: data.role || 'Browser & Task Automation Agent',
       jobDescription: prompt,
       initialGoal: prompt,
       latestPrompt: prompt,
@@ -823,29 +572,27 @@ async function handleControlAction(data) {
       pendingApproval: null,
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      currentAction: spawnedPid
-        ? `Running autonomous mission (PID ${spawnedPid})`
-        : 'Initialized & queued in Mission Control',
+      currentAction: 'Approved & active on Mission Control panel',
       currentThinking: '',
       activeSkills: ['skill-first-operator', 'multi-agent-mission-control'],
       plannedTodos: todos,
       workDone: [
         {
           stepIndex: 1,
-          tool: 'mission_launch',
-          action: 'Agent launched from Mission Control',
+          tool: 'mission_enroll',
+          action: 'Approved onto Mission Control panel',
           summary: `Mission assigned: ${prompt.slice(0, 80)}`,
           detail: workspace,
           timestamp: new Date().toISOString(),
         },
       ],
       totalSteps: 1,
-      pid: spawnedPid,
+      pid: null,
     };
 
     state.customAgents.unshift(newAgent);
     saveState(state);
-    return { ok: true, message: `Launched ${newAgent.title}`, agent: newAgent };
+    return { ok: true, message: `Approved & added "${newAgent.title}" to panel`, agent: newAgent };
   }
 
   if (!id) {
@@ -855,53 +602,31 @@ async function handleControlAction(data) {
   const ov = getOverride(state, id);
 
   if (action === 'stop') {
-    let killResult = { killed: false };
-    if (pid) {
-      killResult = await killProcessByPid(Number(pid));
-    }
+    if (pid) await killProcessByPid(Number(pid));
     ov.status = 'stopped';
     ov.stoppedAt = new Date().toISOString();
     saveState(state);
-    return {
-      ok: true,
-      status: 'stopped',
-      killedProcess: killResult.killed,
-      message: killResult.killed
-        ? `Stopped OS process PID ${pid} and paused agent.`
-        : 'Agent marked as Stopped in Mission Control.',
-    };
+    return { ok: true, status: 'stopped', message: 'Agent stopped.' };
   }
 
   if (action === 'start' || action === 'resume') {
     ov.status = 'running';
     ov.resumedAt = new Date().toISOString();
     saveState(state);
-    return {
-      ok: true,
-      status: 'running',
-      message: 'Agent resumed and set to Running.',
-    };
+    return { ok: true, status: 'running', message: 'Agent started / resumed.' };
   }
 
   if (action === 'approve') {
     ov.status = 'running';
     ov.lastApprovedAt = new Date().toISOString();
     saveState(state);
-    return {
-      ok: true,
-      status: 'running',
-      message: 'Pending approval cleared and agent marked Running.',
-    };
+    return { ok: true, status: 'running', message: 'Pending approval granted — agent set to Running.' };
   }
 
   if (action === 'flag_approval') {
     ov.status = 'pending_approval';
     saveState(state);
-    return {
-      ok: true,
-      status: 'pending_approval',
-      message: 'Agent flagged as Pending Approval.',
-    };
+    return { ok: true, status: 'pending_approval', message: 'Agent flagged as Pending Approval.' };
   }
 
   if (action === 'update_meta') {
@@ -910,7 +635,7 @@ async function handleControlAction(data) {
     if (data.jobDescription !== undefined) ov.jobDescription = String(data.jobDescription).trim();
     if (data.workspace !== undefined) ov.workspace = String(data.workspace).trim();
     saveState(state);
-    return { ok: true, message: 'Updated agent mission details.' };
+    return { ok: true, message: 'Updated agent details.' };
   }
 
   if (action === 'add_todo') {
@@ -932,7 +657,6 @@ async function handleControlAction(data) {
       const nextMap = { pending: 'in_progress', in_progress: 'completed', completed: 'pending' };
       target.status = nextMap[target.status] || 'completed';
     } else if (data.todoText) {
-      // Promote an auto-detected todo into custom override state
       ov.todos.push({
         id: data.todoId || `custom-todo-${Date.now()}`,
         text: data.todoText,
@@ -956,116 +680,69 @@ async function handleControlAction(data) {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Boot Both Antigravity SidecarApp (if inside AGY) AND Standalone HTTP Server
+// Standalone HTTP Server (http://localhost:4400)
 // ---------------------------------------------------------------------------
 
 const readLocal = (name) => readFileSync(join(HERE, name), 'utf8');
 
-function startStandaloneServer(port) {
-  const server = createServer(async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-sidecar-token');
+const server = createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204);
-      res.end();
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  const urlObj = new URL(req.url || '/', `http://localhost:${PORT}`);
+  const pathname = urlObj.pathname;
+
+  try {
+    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(readLocal('index.html'));
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/app.js') {
+      res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+      res.end(readLocal('app.js'));
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/styles.css') {
+      res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8' });
+      res.end(readLocal('styles.css'));
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/api/fleet') {
+      const snapshot = getFleetSnapshot();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(snapshot));
+      return;
+    }
+    if (req.method === 'POST' && pathname === '/api/control') {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk;
+      });
+      req.on('end', async () => {
+        const parsed = safeJsonParse(body) || {};
+        const result = await handleControlAction(parsed);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      });
       return;
     }
 
-    const urlObj = new URL(req.url || '/', `http://localhost:${port}`);
-    const pathname = urlObj.pathname;
-
-    try {
-      if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(readLocal('index.html'));
-        return;
-      }
-      if (req.method === 'GET' && pathname === '/app.js') {
-        res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
-        res.end(readLocal('app.js'));
-        return;
-      }
-      if (req.method === 'GET' && pathname === '/preload.js') {
-        // Fallback no-op preload when opened directly in Chrome/Edge at http://localhost:4400
-        res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
-        res.end('window.__STANDALONE_MISSION_CONTROL__ = true;');
-        return;
-      }
-      if (req.method === 'GET' && pathname === '/styles.css') {
-        res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8' });
-        res.end(readLocal('styles.css'));
-        return;
-      }
-      if (req.method === 'GET' && pathname === '/api/fleet') {
-        const snapshot = getFleetSnapshot();
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(snapshot));
-        return;
-      }
-      if (req.method === 'POST' && pathname === '/api/control') {
-        let body = '';
-        req.on('data', (chunk) => {
-          body += chunk;
-        });
-        req.on('end', async () => {
-          const parsed = safeJsonParse(body) || {};
-          const result = await handleControlAction(parsed);
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify(result));
-        });
-        return;
-      }
-
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Not found' }));
-    } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
-    }
-  });
-
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.log(`Mission Control standalone server already active on port ${port}`);
-    } else {
-      console.error('Standalone server error:', err);
-    }
-  });
-
-  server.listen(port, '127.0.0.1', () => {
-    console.log(`Mission Control live at http://localhost:${port}`);
-  });
-}
-
-async function boot() {
-  // Always start the standalone localhost:4400 web server so browser tabs work anytime
-  startStandaloneServer(STANDALONE_PORT);
-
-  // If launched by Antigravity with sidecar_sdk available, also start SidecarApp for the Aux Pane
-  try {
-    const sdk = await import('sidecar_sdk');
-    if (sdk && sdk.SidecarApp && process.env.ANTIGRAVITY_SIDECAR_WEB_PORT) {
-      const { SidecarApp, Response } = sdk;
-      const app = new SidecarApp();
-
-      app.page('/', () => readLocal('index.html'));
-      app.page('/app.js', () => readLocal('app.js'));
-      app.api(
-        '/styles.css',
-        () => new Response(readLocal('styles.css'), { contentType: 'text/css' }),
-        'GET'
-      );
-      app.api('/api/fleet', () => getFleetSnapshot(), 'GET');
-      app.api('/api/control', async (data) => handleControlAction(data), 'POST');
-
-      app.run();
-      console.log(`Antigravity SidecarApp listening on ${process.env.ANTIGRAVITY_SIDECAR_WEB_PORT}`);
-    }
-  } catch {
-    // Running standalone via `node main.mjs` outside Antigravity sidecar container
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  } catch (err) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: err.message }));
   }
-}
+});
 
-boot();
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`Gemini Mission Control live at http://localhost:${PORT}`);
+});
