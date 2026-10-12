@@ -1,11 +1,16 @@
-# Ignore machine-local state, caches, and auth configs
+# Ignore machine-local runtime files, caches, and auth tokens
 *
 !.gitignore
 !README.md
 !GEMINI.md
+!CLAUDE.md
 !AGENTS.md
 !skills.json
 !skills/
 !skills/**
+!gemini/
+!gemini/**
+!claude/
+!claude/**
 !rules/
 !rules/**
