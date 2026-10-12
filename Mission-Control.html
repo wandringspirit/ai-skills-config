@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Mission Control Launcher</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0b0f19;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    iframe {
+      flex: 1;
+      width: 100%;
+      border: none;
+    }
+    .fallback {
+      position: fixed;
+      inset: 0;
+      background: #0b0f19;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .fallback[hidden] { display: none; }
+    .card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 560px;
+      width: 100%;
+    }
+    h1 { font-size: 18px; margin-bottom: 8px; color: #38bdf8; }
+    p { font-size: 13.5px; color: #94a3b8; line-height: 1.5; margin-bottom: 14px; }
+    pre {
+      background: #0b0f19;
+      border: 1px solid #1e293b;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 12px;
+      color: #34d399;
+      overflow-x: auto;
+      margin-bottom: 14px;
+    }
+    .btn {
+      background: #0284c7;
+      color: #fff;
+      border: 1px solid #38bdf8;
+      padding: 8px 14px;
+      border-radius: 7px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="mc-frame" src="http://localhost:4400" title="Agent Mission Control"></iframe>
+  <div id="fallback" class="fallback" hidden>
+    <div class="card">
+      <h1>Agent Mission Control Server Offline</h1>
+      <p>Start the local telemetry daemon in PowerShell to stream live Gemini &amp; Claude sessions:</p>
+      <pre>node "$HOME\ai-skills-config\gemini\plugins\mission-control\sidecars\panel\main.mjs"</pre>
+      <a href="http://localhost:4400" class="btn">Open http://localhost:4400 ↻</a>
+    </div>
+  </div>
+  <script>
+    fetch('http://localhost:4400/api/fleet')
+      .then((r) => {
+        if (r.ok && window.location.protocol === 'file:') {
+          window.location.replace('http://localhost:4400');
+        }
+      })
+      .catch(() => {
+        document.getElementById('fallback').hidden = false;
+      });
+  </script>
+</body>
+</html>
