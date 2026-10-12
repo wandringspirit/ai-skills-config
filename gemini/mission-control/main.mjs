@@ -1,7 +1,7 @@
 // Standalone Gemini Agent Mission Control Server (http://localhost:4400)
-// - Zero Antigravity sidecar/plugin dependency (100% standalone Node.js + HTML panel)
-// - Tracks ONLY Gemini agents that the user has explicitly approved/enrolled onto the panel
-// - Provides a "Candidate Chats" drawer so the user can approve/enroll or remove any chat at will
+// - 100% standalone Node.js HTTP server (zero plugin/sidecar dependency)
+// - Tracks ONLY Gemini agents (~/.gemini/antigravity/brain/<conversation-id>/)
+// - Strict User Approval Gate: ONLY agents in `enrolledIds` (or custom registered tasks) appear on the main board
 
 import {
   closeSync,
@@ -61,7 +61,7 @@ function getOverride(state, id) {
 }
 
 // ---------------------------------------------------------------------------
-// Fast JSONL Reader
+// Fast JSONL Head/Tail Reader
 // ---------------------------------------------------------------------------
 
 function readJsonlHeadAndTail(filePath, headBytes = 32768, tailBytes = 131072) {
@@ -69,7 +69,12 @@ function readJsonlHeadAndTail(filePath, headBytes = 32768, tailBytes = 131072) {
     const st = statSync(filePath);
     const size = st.size;
     if (size === 0) {
-      return { headLines: [], tailLines: [], mtimeMs: st.mtimeMs, btimeMs: st.birthtimeMs || st.ctimeMs };
+      return {
+        headLines: [],
+        tailLines: [],
+        mtimeMs: st.mtimeMs,
+        btimeMs: st.birthtimeMs || st.ctimeMs,
+      };
     }
 
     const fd = openSync(filePath, 'r');
@@ -81,7 +86,12 @@ function readJsonlHeadAndTail(filePath, headBytes = 32768, tailBytes = 131072) {
           .toString('utf8')
           .split(/\r?\n/)
           .filter((l) => l.trim().startsWith('{'));
-        return { headLines: lines, tailLines: lines, mtimeMs: st.mtimeMs, btimeMs: st.birthtimeMs || st.ctimeMs };
+        return {
+          headLines: lines,
+          tailLines: lines,
+          mtimeMs: st.mtimeMs,
+          btimeMs: st.birthtimeMs || st.ctimeMs,
+        };
       }
 
       const hBuf = Buffer.alloc(headBytes);
@@ -150,7 +160,7 @@ function parseMarkdownChecklist(mdContent) {
 }
 
 // ---------------------------------------------------------------------------
-// Scan Gemini Sessions & Separate Enrolled vs Candidate Chats
+// Scan Gemini Sessions & Separate Approved (`enrolledIds`) vs Candidates
 // ---------------------------------------------------------------------------
 
 function scanGeminiSessions(state) {
@@ -196,7 +206,9 @@ function scanGeminiSessions(state) {
     for (const s of [...headSteps, ...tailSteps]) {
       if (s && s.step_index !== undefined) stepMap.set(s.step_index, s);
     }
-    const allSampledSteps = Array.from(stepMap.values()).sort((a, b) => a.step_index - b.step_index);
+    const allSampledSteps = Array.from(stepMap.values()).sort(
+      (a, b) => a.step_index - b.step_index
+    );
 
     const startedAtIso = headSteps[0]?.created_at || new Date(btimeMs || mtimeMs).toISOString();
     const updatedAtIso =
@@ -204,6 +216,7 @@ function scanGeminiSessions(state) {
 
     let initialPrompt = '';
     let latestPrompt = '';
+    let bestSubstantivePrompt = '';
     const userPrompts = [];
     let workspace = override.workspace || '';
     let currentAction = 'Waiting for instructions';
@@ -218,6 +231,9 @@ function scanGeminiSessions(state) {
         if (cleaned) {
           if (!initialPrompt) initialPrompt = cleaned;
           latestPrompt = cleaned;
+          if (cleaned.length >= 25 && !bestSubstantivePrompt) {
+            bestSubstantivePrompt = cleaned;
+          }
           userPrompts.push({
             stepIndex: step.step_index,
             text: cleaned,
@@ -249,11 +265,11 @@ function scanGeminiSessions(state) {
             const args = tc.args || {};
             const summary = args.toolSummary || args.Description || tc.name;
             const action = args.toolAction || summary;
-            currentAction = action;
+            currentAction = String(action).replace(/^"|"$/g, '');
 
             const candidatePath = args.Cwd || args.TargetFile || args.AbsolutePath || '';
             if (!workspace && typeof candidatePath === 'string') {
-              const projMatch = candidatePath.match(/^([a-zA-Z]:[\\/]+Projects[\\/]+[^\\/]+)/i);
+              const projMatch = candidatePath.match(/^([a-zA-Z]:[\\/]+Projects[\\/]+[^\\/"]+)/i);
               if (projMatch) {
                 workspace = projMatch[1].replace(/\//g, '\\');
               }
@@ -273,13 +289,13 @@ function scanGeminiSessions(state) {
 
             let detail = '';
             if (tc.name === 'write_to_file' || tc.name === 'replace_file_content') {
-              detail = args.TargetFile ? basename(args.TargetFile) : '';
+              detail = args.TargetFile ? basename(String(args.TargetFile).replace(/^"|"$/g, '')) : '';
             } else if (tc.name === 'run_command') {
-              detail = args.CommandLine ? String(args.CommandLine).slice(0, 100) : '';
+              detail = args.CommandLine ? String(args.CommandLine).replace(/^"|"$/g, '').slice(0, 100) : '';
             } else if (tc.name === 'search_web' || tc.name === 'read_url_content') {
               detail = args.query || args.Url || '';
             } else if (tc.name === 'view_file') {
-              detail = args.AbsolutePath ? basename(args.AbsolutePath) : '';
+              detail = args.AbsolutePath ? basename(String(args.AbsolutePath).replace(/^"|"$/g, '')) : '';
             }
 
             workDone.push({
@@ -333,7 +349,6 @@ function scanGeminiSessions(state) {
       };
     }
 
-    // Check task.md / implementation_plan.md
     let artifactTodos = [];
     for (const candidateMd of ['task.md', 'implementation_plan.md', 'plan.md']) {
       const p = join(dir.fullPath, candidateMd);
@@ -380,8 +395,9 @@ function scanGeminiSessions(state) {
       status = 'running';
     }
 
+    const smartTitleSource = bestSubstantivePrompt || latestPrompt || initialPrompt;
     const defaultTitle =
-      initialPrompt.slice(0, 68) || `Gemini Agent ${conversationId.slice(0, 8)}`;
+      smartTitleSource.slice(0, 72) || `Gemini Agent ${conversationId.slice(0, 8)}`;
     const defaultRole = workspace
       ? `${basename(workspace)} Autonomous Agent`
       : 'Browser & Task Automation Agent';
@@ -426,20 +442,12 @@ function scanGeminiSessions(state) {
 }
 
 // ---------------------------------------------------------------------------
-// Fleet Snapshot (Separates Approved/Enrolled Agents vs Candidate Chats)
+// Fleet Snapshot (Strict User Approval Gate — No Unapproved Auto-Enrollment)
 // ---------------------------------------------------------------------------
 
 function getFleetSnapshot() {
   const state = loadState();
   const allGemini = scanGeminiSessions(state);
-
-  // Auto-enroll current active chat ONLY if enrolledIds is completely empty on very first boot
-  // so the board isn't blank on first open, while keeping all other chats unenrolled until approved.
-  if (state.enrolledIds.length === 0 && state.customAgents.length === 0 && allGemini.length > 0) {
-    state.enrolledIds.push(allGemini[0].id);
-    allGemini[0].enrolled = true;
-    saveState(state);
-  }
 
   const customAgents = (state.customAgents || []).map((ca) => {
     const override = state.overrides[ca.id] || {};
@@ -510,8 +518,8 @@ async function handleControlAction(data) {
   const state = loadState();
   const { action, id, pid } = data || {};
 
-  // Allow any chat or user to enroll/approve an agent onto the Mission Control panel
   if (action === 'enroll_agent') {
+    if (!id) return { ok: false, error: 'Missing id' };
     const targetId = id.startsWith('gemini:') || id.startsWith('custom:') ? id : `gemini:${id}`;
     if (!state.enrolledIds.includes(targetId)) {
       state.enrolledIds.push(targetId);
@@ -533,7 +541,6 @@ async function handleControlAction(data) {
     return { ok: true, message: 'Agent approved and added to Mission Control panel.' };
   }
 
-  // Remove an agent from the Mission Control panel
   if (action === 'unenroll_agent') {
     state.enrolledIds = (state.enrolledIds || []).filter(
       (eid) => eid !== id && `gemini:${eid}` !== id
@@ -546,7 +553,8 @@ async function handleControlAction(data) {
   if (action === 'launch_agent') {
     const newId = `custom:${Date.now()}`;
     const workspace = data.workspace || 'c:\\Projects\\ring-size';
-    const prompt = data.prompt || data.jobDescription || 'Execute assigned browser & automation tasks';
+    const prompt =
+      data.prompt || data.jobDescription || 'Execute assigned browser & automation tasks';
     const todos = Array.isArray(data.todos)
       ? data.todos.map((t, i) => ({
           id: `todo-${Date.now()}-${i}`,
@@ -620,7 +628,11 @@ async function handleControlAction(data) {
     ov.status = 'running';
     ov.lastApprovedAt = new Date().toISOString();
     saveState(state);
-    return { ok: true, status: 'running', message: 'Pending approval granted — agent set to Running.' };
+    return {
+      ok: true,
+      status: 'running',
+      message: 'Pending approval granted — agent set to Running.',
+    };
   }
 
   if (action === 'flag_approval') {
@@ -741,6 +753,14 @@ const server = createServer(async (req, res) => {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: err.message }));
   }
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`Mission Control server already running on http://localhost:${PORT}`);
+    process.exit(0);
+  }
+  console.error('Server error:', err);
 });
 
 server.listen(PORT, '127.0.0.1', () => {

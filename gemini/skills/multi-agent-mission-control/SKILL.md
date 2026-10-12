@@ -1,69 +1,63 @@
 ---
 name: multi-agent-mission-control
 description: >-
-  Architecture and implementation guide for building a real-time Multi-Agent Mission
-  Control Dashboard that monitors, inspects, starts, pauses, and stops multiple concurrent
-  Gemini (Antigravity) and Claude Code agents across chats and workspaces.
+  Architecture and implementation guide for building a 100% standalone Gemini Agent
+  Mission Control Dashboard (http://localhost:4400 + Windows Desktop Shortcut) with a
+  strict user approval gate deciding which agents appear on the panel, live status,
+  pending approvals, elapsed runtime, planned todo checklists, work completed history,
+  and 1-click Start/Stop controls.
 ---
 
-# Multi-Agent Mission Control Operator (`multi-agent-mission-control`)
+# Gemini Agent Mission Control Operator (`multi-agent-mission-control`)
 
-Use this skill whenever the user asks to monitor, orchestrate, inspect, or control multiple AI agents (Gemini / Antigravity chats, subagents, background tasks, and Claude Code / Desktop sessions) from a unified dashboard.
-
----
-
-## 1. Why a Plain Static `.html` File Isn't Enough (and What Works Best)
-
-A plain `file:///.../dashboard.html` opened in a browser **cannot**:
-- Read local session files in `~/.gemini/antigravity/brain/` or `~/.claude/sessions/` due to browser CORS / `file://` sandbox restrictions.
-- Kill/stop a running process (`PID`) or send a prompt/resume command to a running agent.
-
-### The 3 Architecture Options (Ranked)
-
-| Option | How It Works | Pros | Cons |
-|---|---|---|---|
-| **Option A (Recommended): Local Node.js Mission Control Server + Web Dashboard (`http://localhost:4400`) + Antigravity Sidecar Panel** | A lightweight zero-dependency Node.js server that reads `~/.gemini/antigravity/brain/*` + `~/.claude/sessions/*` in real time AND exposes REST/SSE APIs to Start, Resume, Approve, or Stop (`kill PID`) any agent. Can be opened in any browser tab **and** docked inside Antigravity as a UI Extension sidecar! | Works across **both** Gemini & Claude; real-time live logs; 1-click Start/Stop buttons actually work; zero external dependencies. | Needs the lightweight background Node process running (can be auto-started by Antigravity sidecar). |
-| **Option B: Antigravity UI Extension Plugin Only (`~/.gemini/config/plugins/mission-control/`)** | Runs `SidecarApp` inside Antigravity's right-hand auxiliary pane and uses `window.sidecar.ui.toggleConversation(id)` and `window.sidecar.agent.sendMessage()`. | Auto-starts with Antigravity; native theme sync; 1-click jump to any Antigravity chat. | Docked inside Antigravity window rather than a full-screen standalone monitor unless opened via its localhost port. |
-| **Option C: Agent-Written Status Registry + Static HTML** | Every agent writes its status to a shared `agents-status.json` file. | Simple file format. | Fragile if an agent crashes mid-step; static HTML still needs a local HTTP server to poll JSON and cannot stop/start OS processes. |
-
-**Best Solution**: **Hybrid Option A + B** — Build a single **Antigravity UI Extension Plugin (`mission-control`)** whose Node.js backend (`main.mjs`) **also** binds a fixed convenience port (`http://localhost:4400`) so the user can view it either:
-1. Full-screen in any browser tab at `http://localhost:4400`, **OR**
-2. Docked right inside Antigravity's side pane!
+Use this skill whenever the user asks to monitor, orchestrate, inspect, approve, or control multiple autonomous Gemini agents (including browser-automation and background task agents) across multiple chats from a standalone control panel.
 
 ---
 
-## 2. Telemetry Sources Discovered on Disk
+## 1. 100% Standalone Architecture (No Plugin/Sidecar Dependency, Gemini Only)
 
-### A. Gemini / Antigravity (`~/.gemini/antigravity/brain/<conversation-id>/`)
-- **Transcript Log**: `.system_generated/logs/transcript.jsonl`
-  - First `USER_INPUT` step → Initial goal / mission title.
-  - Latest step (`type`, `status`, `created_at`, `tool_calls`) → Current activity, active tool (`toolAction` / `toolSummary`), and whether it is waiting for approval (`ask_question` or blocked tool call).
-  - Subagents spawned → `tool_calls` where `name === "invoke_subagent"`.
-- **Planned Todo / Progress**:
-  - `task.md` or `implementation_plan.md` in `<brain>/<conversation-id>/` (parses `- [x]` completed, `- [/]` in-progress, `- [ ]` planned todo items) OR shared `<workspace>/.agents/mission-status.json`.
-- **Background Tasks**:
-  - `.system_generated/tasks/*.log`
-
-### B. Claude Code / Claude Desktop (`~/.claude/`)
-- **Live Session Registry**: `~/.claude/sessions/<pid>.json`
-  - Fields: `pid`, `sessionId`, `cwd` (workspace path), `startedAt` (epoch ms), `name` (task title), `status` (`running`, `idle`, `waiting`), `statusUpdatedAt`, `entrypoint` (`claude-desktop`, `cli`).
-- **Project Transcripts**: `~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl`
-  - Contains recent messages, tool uses, and todo lists (`TodoWrite` tool calls).
+- **Location**: `$HOME\ai-skills-config\gemini\mission-control\` (`C:\Users\piyus\ai-skills-config\gemini\mission-control\`)
+- **Zero Dependencies**: `main.mjs` uses only built-in Node.js modules (`node:fs`, `node:path`, `node:os`, `node:http`, `node:url`, `node:child_process`). Do NOT depend on `sidecar_sdk` or any IDE plugin/extension framework.
+- **Port**: Serves the Mission Control web app at **`http://localhost:4400`**.
+- **Desktop Shortcut (`Mission Control.lnk`)**: Created on `$([Environment]::GetFolderPath('Desktop'))\Mission Control.lnk` pointing to `start-mc.ps1`, which starts `main.mjs` hidden in the background and opens `http://localhost:4400` in the user's default browser.
 
 ---
 
-## 3. Core Dashboard Features Checklist
+## 2. Strict User Approval Gate for Panel Enrollment (`enrolledIds`)
 
-1. **Fleet Overview Bar**:
-   - Total Active Agents | Pending Your Approval (highlighted in amber/red) | Running | Idle/Completed.
-2. **Agent Fleet List (Left Pane / Main Grid)**:
-   - Engine badge (`Gemini / Antigravity` vs `Claude`), Chat/Session Title, Workspace path (`cwd`), **Running Since / Elapsed Time**, Live Status Pill (`🟢 Running`, `🟡 Needs Approval`, `⚪ Idle`, `🔴 Error/Stopped`), and current tool action.
-3. **Deep-Dive Inspector Drawer (Click Any Agent)**:
-   - **Role & Mission**: What its job is and initial user prompt.
-   - **Pending Approval Banner**: Exact question or command waiting for user sign-off + 1-click Jump/Approve.
-   - **Planned Todo Checklist**: Visual progress bar + Completed (`[x]`), In Progress (`[/]`), and Upcoming (`[ ]`) tasks.
-   - **Work Completed So Far**: Timeline of recent tool calls, files edited, and commands executed.
-4. **Process Controls (Start / Stop / Message)**:
-   - **Stop Button**: Terminates running background task / Claude `PID` or cancels active turn.
-   - **Start / Send Instruction Button**: Starts a new agent session (`window.sidecar.agent.startConversation` or `claude -p`) or sends a follow-up instruction to the selected agent.
-   - **Jump to Chat Button**: Calls `window.sidecar.ui.toggleConversation(conversationId)` in Antigravity.
+- **Do NOT dump every historical chat onto the main panel**:
+  - Maintain an explicit `enrolledIds` allowlist in `mission-control-state.json`.
+  - **Only agents explicitly approved/enrolled by the user** appear on the main Mission Control board.
+- **Two Ways to Approve an Agent onto the Panel**:
+  1. **From the Dashboard (`✓ Approve / Add Chat to Panel` modal)**: Lists discovered Gemini chats (`candidates`) with their Chat ID, start time, title, and current activity, plus a **`✓ Approve to Panel`** button.
+  2. **From Any New Chat (`enroll_agent` API)**: When the user assigns a browser or automation mission in a new chat and asks the agent to register on Mission Control, the agent sends:
+     ```powershell
+     Invoke-RestMethod -Uri "http://localhost:4400/api/control" -Method POST -ContentType "application/json" -Body (@{
+       action = "enroll_agent"
+       id = "<conversation-id>"
+       title = "<Mission Title>"
+       role = "<Agent Role>"
+       jobDescription = "<Detailed Mission Summary>"
+       todos = @("Step 1", "Step 2", "Step 3")
+     } | ConvertTo-Json)
+     ```
+- **1-Click Removal**: Every enrolled agent has a **`✕ Remove from Panel`** button in the inspector header.
+
+---
+
+## 3. Real-Time Telemetry Per Approved Agent (`~/.gemini/antigravity/brain/<conversation-id>/`)
+
+Every 3 seconds, read the head and tail of `.system_generated/logs/transcript.jsonl` and `task.md` / `implementation_plan.md` for each enrolled Gemini chat:
+1. **Running Since & Elapsed Time**: Exact start date/time + live elapsed runtime + relative time since last action.
+2. **Live Status Badge**:
+   - `🟡 PENDING APPROVAL`: Triggered when the agent calls `ask_question`, pauses for human confirmation before an external browser/live action, or is manually flagged.
+   - `🟢 RUNNING`: Actively executing browser actions, commands, or file edits (updated within the last 45s).
+   - `⚪ IDLE / READY`: Waiting for next instruction.
+   - `🛑 STOPPED`: Paused/stopped by the user from Mission Control.
+3. **Click-to-Inspect Deep Dive**:
+   - **⚠ Pending Approval Banner** with 1-click **`✓ Approve & Continue`**
+   - **⚡ What's Happening Right Now** (`toolAction` / `toolSummary` + `thinking`)
+   - **🎯 What Its Job Is** (Editable Title, Role, Mission Summary, Latest Prompt)
+   - **📋 What's Planned** (Interactive Todo Checklist: `⬜ Pending` → `🔄 In Progress` → `✅ Completed`)
+   - **✅ Work Completed Till Now** (Reverse-chronological timeline of browser actions, commands, file edits, and searches)
+   - **▶ Start / ■ Stop Buttons** on every card and in the inspector header.
