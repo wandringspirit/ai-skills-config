@@ -10,59 +10,45 @@ description: >-
 
 # ActualRingSize SEO & Traffic Operator Skill (`seo-traffic-operator`)
 
-This skill equips the agent (and the dedicated `seo-traffic-agent` subagent) to execute all technical SEO, search console indexing, programmatic content expansion, and organic traffic acquisition workflows for **ActualRingSize**.
+This skill equips the agent (and the dedicated `seo-traffic-agent` subagent) to execute all technical SEO, search console indexing, programmatic content expansion, and organic traffic acquisition workflows for **ActualRingSize (`https://actualringsizer.com`)**.
 
 ---
 
 ## 0. Mandatory Safety & Permission Gates (STRICTLY ENFORCED)
 
 1. **Final Domain Live Gate**:
-   - **DO NOT** execute external indexing, community posts, Pinterest pins, or B2B outreach while `SITE_URL` in [`src/lib/studio-meta.ts`](../../../src/lib/studio-meta.ts) is still a temporary staging domain or unconfigured placeholder, **unless** the user explicitly confirms the final custom domain is live.
-   - Before starting any external SEO campaign, check [`src/lib/studio-meta.ts`](../../../src/lib/studio-meta.ts) and confirm with the user that the production domain is live and serving HTTPS (`200 OK`).
+   - Production domain **`https://actualringsizer.com`** (`SITE_URL` in [`src/lib/studio-meta.ts`](../../../src/lib/studio-meta.ts)) is **LIVE** on Cloudflare Workers Static Assets (`200 OK`), with duplicate `.workers.dev` and Vercel hosts disabled.
+   - Before starting any external SEO campaign, verify `https://actualringsizer.com` is serving HTTPS (`200 OK`).
 2. **Human-in-the-Loop Approval Gate (Zero Unapproved Posting)**:
    - **NEVER** publish a post, comment, pin, message, email, or form submission on any external platform (Reddit, Pinterest, WatchUSeek, Quora, Etsy, Shopify, Google Search Console, Bing Webmaster Tools) without **first showing the user the exact draft, target URL, and destination** and receiving explicit `"Yes / Approved"` confirmation.
    - If the agent needs login credentials, 2FA, or browser access (via `/browser`), stop and ask the user for permission first.
 
 ---
 
-## 1. Runbook A: Final Domain Cutover & Technical SEO Audit
+## 1. Runbook A: Technical SEO & Deployment Audit (`https://actualringsizer.com`)
 
-When the user provides their purchased custom domain (e.g., `https://actualringsizer.com`):
-
-1. **Update Single-Source Constants**:
-   - Edit `SITE_URL` and `SUPPORT_EMAIL` in [`src/lib/studio-meta.ts`](../../../src/lib/studio-meta.ts).
-   - Replace all domain URLs in [`public/sitemap.xml`](../../../public/sitemap.xml), [`public/robots.txt`](../../../public/robots.txt), and [`docs/DEPLOY.md`](../../../docs/DEPLOY.md).
-2. **Run Verification Suite**:
-   - Run `npx vitest run` (must pass all 29+ tests).
-   - Run `npm run build` (must pre-render all 14+ static routes into `dist/client`).
-3. **Commit & Push to Vercel**:
-   - Push to `origin/main` (`git@github.com:wandringspirit/ring-size.git`) so Vercel (`vercel.com/piyush-1ddf/ring-size`) deploys the updated canonical tags and sitemap.
+1. **Single-Source Constants**:
+   - `SITE_URL = 'https://actualringsizer.com'` and `SUPPORT_EMAIL = 'support@actualringsizer.com'` in [`src/lib/studio-meta.ts`](../../../src/lib/studio-meta.ts).
+   - Sitemap and crawler rules in [`public/sitemap.xml`](../../../public/sitemap.xml) (26 routes) and [`public/robots.txt`](../../../public/robots.txt).
+   - IndexNow verification key file in [`public/08a29e7105054e33aac3a1c04a0fcef3.txt`](../../../public/08a29e7105054e33aac3a1c04a0fcef3.txt).
+2. **Verification Suite**:
+   - Run `npm test` (must pass all 34+ Vitest tests across 4 suites).
+   - Run `npm run build` (must pre-render all 26+ static routes into `dist/client`).
+3. **Commit & Push to Cloudflare Workers**:
+   - Push to `origin/main` (`git@github.com:wandringspirit/ring-size.git`) so Cloudflare Workers (`ring-size` project, configured via `wrangler.jsonc` + `worker.ts`) deploys automatically to `https://actualringsizer.com`.
 4. **Live Canonical & Schema Verification**:
-   - Fetch the live domain root `/`, `/watch`, `/diamonds`, `/conversion`, `/sitemap.xml`, and `/robots.txt` to verify HTTP 200, `<link rel="canonical">`, `hreflang` alternates, and JSON-LD `@graph` schemas.
+   - Fetch `https://actualringsizer.com/`, `/watch`, `/diamonds`, `/conversion`, `/sitemap.xml`, and `/robots.txt` to verify HTTP 200, `<link rel="canonical">`, `hreflang` alternates, and JSON-LD `@graph` schemas.
 
 ---
 
-## 2. Runbook B: Google Search Console & Bing Webmaster Onboarding (Browser-Assisted)
+## 2. Runbook B: Google Search Console, Bing Webmaster & IndexNow Operations
 
-Once the final domain is live:
-
-1. **Ask Permission**: Ask the user to confirm before opening or interacting with Google Search Console (`search.google.com/search-console`) and Bing Webmaster Tools (`bing.com/webmasters`) as `piyushgaur17@gmail.com`.
-2. **Google Search Console Setup**:
-   - Add Domain Property → Copy DNS TXT verification token → Ask user approval before adding TXT record in DNS registrar.
-   - Submit `https://<final-domain>/sitemap.xml` under **Sitemaps**.
-   - Use **URL Inspection → Request Indexing** on the 10 priority routes:
-     1. `/`
-     2. `/watch`
-     3. `/diamonds`
-     4. `/conversion`
-     5. `/how-to-measure-ring-size`
-     6. `/mens-womens-ring-size-guide`
-     7. `/printable-ring-sizer`
-     8. `/watch-size-guide`
-     9. `/diamond-carat-size-chart`
-     10. `/faq`
-3. **Bing Webmaster Tools & AI Search Setup**:
-   - Open `bing.com/webmasters` → Click **Import from Google Search Console** (automatically indexes the domain for Bing, **ChatGPT Search**, **Microsoft Copilot**, and **DuckDuckGo**).
+1. **Google Search Console (`sc-domain:actualringsizer.com` — LIVE)**:
+   - Sitemap `https://actualringsizer.com/sitemap.xml` submitted (`26 discovered pages`).
+   - Priority routes inspected and requested for indexing (`/`, `/watch`, `/diamonds`, `/conversion`, `/how-to-measure-ring-size`, `/mens-womens-ring-size-guide`, `/printable-ring-sizer`, `/watch-size-guide`, `/diamond-carat-size-chart`, `/faq`).
+2. **Bing Webmaster Tools & IndexNow API (LIVE)**:
+   - Property imported from Google Search Console (`26 URLs submitted`).
+   - Whenever new routes are added, ping `https://api.indexnow.org/IndexNow` with host `actualringsizer.com` and key `08a29e7105054e33aac3a1c04a0fcef3` to immediately index in Bing, **ChatGPT Search**, **Microsoft Copilot**, and **DuckDuckGo**.
 
 ---
 
@@ -77,7 +63,7 @@ To drive immediate targeted visitors (Days 1–30):
      - Diamond carat face-up size comparisons on specific finger sizes.
 2. **Draft Value-First Response with Deep Link**:
    - Compute the exact deterministic millimeter numbers using [`src/lib/measurements.ts`](../../../src/lib/measurements.ts).
-   - Generate a deep-linked studio URL (e.g., `https://<domain>/watch?case=36&lug=43.3&strap=20&lprof=curved` or `https://<domain>/?d=17.32&m=ring`).
+   - Generate a deep-linked studio URL (e.g., `https://actualringsizer.com/watch?case=36&lug=43.3&strap=20&lprof=curved` or `https://actualringsizer.com/?d=17.32&m=ring`).
 3. **MANDATORY APPROVAL STEP**:
    - Present a preview table to the user containing:
      - **Target Thread URL & Title**
@@ -104,5 +90,5 @@ To drive immediate targeted visitors (Days 1–30):
 When scaling organic search impressions (Weeks 2–8):
 
 1. Analyze top queries and impressions from Google Search Console or [`docs/SEO.md`](../../../docs/SEO.md).
-2. Propose a batch of pre-rendered programmatic routes (e.g., `/size/$slug` for exact millimeter/US/UK/EU/Cartier conversions, or `/diamond/$slug` for exact carat+cut comparisons) that reuse [`src/lib/measurements.ts`](../../../src/lib/measurements.ts).
-3. Ensure every new route is covered by Vitest tests (`npx vitest run`) and static prerendering in [`vite.config.ts`](../../../vite.config.ts).
+2. Propose a batch of pre-rendered programmatic routes in [`src/lib/programmatic-seo.ts`](../../../src/lib/programmatic-seo.ts) and [`src/routes/size.$slug.tsx`](../../../src/routes/size.$slug.tsx) that reuse [`src/lib/measurements.ts`](../../../src/lib/measurements.ts).
+3. Ensure every new route is covered by Vitest tests (`npm test`), listed in [`public/sitemap.xml`](../../../public/sitemap.xml), pre-rendered in [`vite.config.ts`](../../../vite.config.ts), and pushed to IndexNow.
