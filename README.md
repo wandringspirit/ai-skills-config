@@ -1,67 +1,59 @@
-# Universal AI Skills & Master Command Config (`ai-skills-config`)
+# AI Skills & Master Protocol Config (`ai-skills-config`)
 
-Owner: **`wandringspirit`** (`piyushgaur17@gmail.com`)  
-Repository: **`https://github.com/wandringspirit/ai-skills-config`**
+Standalone, zero-duplication repository for **Gemini (Antigravity)** and **Claude (Claude Code / Claude Desktop)**:
 
-A single, standalone repository cloned to `$HOME\ai-skills-config` (`C:\Users\piyus\ai-skills-config`) that both **Google Gemini / Antigravity** and **Anthropic Claude** read from directly via isolated subfolders (`gemini/` and `claude/`).
+- **Unified Shared Skills (`skills/`)**: Both Gemini and Claude link directly to the **single shared `skills/<skill-name>/SKILL.md` folder** so domain knowledge is never duplicated.
+- **Zero SOP Conflict**: Whenever Gemini and Claude need different execution steps for the same skill name, the `SKILL.md` includes separate **`## Gemini (Antigravity) Execution SOP`** and **`## Claude Execution SOP`** sections (or optional `GEMINI-SOP.md` / `CLAUDE-SOP.md` files inside the skill folder). Each agent only edits its own SOP section.
+- **`gemini/GEMINI.md`**: Global master rule file for Gemini / Antigravity (`~/.gemini/config/GEMINI.md`).
+- **`claude/CLAUDE.md` & `claude/agents/`**: Global master rule file (`~/.claude/CLAUDE.md`) and specialist subagents (`~/.claude/agents/`) for Claude.
 
 ---
 
-## Repository Structure (Zero-Collision Architecture)
+## Repository Structure
 
 ```text
-ai-skills-config/                          # Cloned to $HOME\ai-skills-config
-├── README.md                              # Setup guide + Master Prompts for Gemini & Claude
-├── gemini/                                # ISOLATED GEMINI NAMESPACE (Read by ~/.gemini/config)
-│   ├── GEMINI.md                          # Gemini Master Rule
-│   ├── README.md                          # Gemini setup guide
-│   └── skills/                            # Gemini-only skills (view_file, define_subagent, etc.)
-│       ├── skill-first-operator/SKILL.md
-│       └── seo-traffic-operator/SKILL.md
-└── claude/                                # ISOLATED CLAUDE NAMESPACE (Read by ~/.claude)
-    ├── CLAUDE.md                          # Claude Master Rule
-    ├── README.md                          # Claude setup guide
-    ├── agents/                            # Claude-only subagents (~/.claude/agents/)
-    │   ├── skill-first-operator.md
-    │   └── seo-traffic-agent.md
-    └── skills/                            # Claude-only skills (~/.claude/skills/)
-        ├── skill-first-operator/SKILL.md
-        ├── seo-traffic-operator/SKILL.md
-        └── ... (14 Claude skills)
+C:\Users\piyus\ai-skills-config\
+├── README.md
+├── skills\                             <-- Single shared source for all 17+ skills (Zero Duplication)
+│   ├── agents-sdk\SKILL.md
+│   ├── cloudflare\SKILL.md
+│   ├── instagram-creator-operator\SKILL.md
+│   ├── multi-agent-mission-control\SKILL.md
+│   ├── seo-traffic-operator\SKILL.md
+│   ├── skill-first-operator\SKILL.md
+│   ├── windows-desktop-automation\SKILL.md
+│   └── ...
+├── gemini\
+│   ├── GEMINI.md                       <-- Linked to ~/.gemini/config/GEMINI.md
+│   └── README.md
+└── claude\
+    ├── CLAUDE.md                       <-- Linked to ~/.claude/CLAUDE.md
+    ├── README.md
+    └── agents\                         <-- Linked to ~/.claude/agents/
+        └── seo-traffic-agent.md
 ```
 
 ---
 
-## Step 1: Clone the Repo Directly (On Any New Laptop)
-
-Run in Windows PowerShell:
+## 1-Command Restore on Any Windows Laptop (PowerShell)
 
 ```powershell
+# 1. Clone into standalone directory
 git clone https://github.com/wandringspirit/ai-skills-config.git "$HOME\ai-skills-config"
-```
 
----
-
-## Step 2: Connect Google Gemini / Antigravity Directly to `ai-skills-config\gemini`
-
-```powershell
+# 2. Link Gemini / Antigravity directly to gemini/GEMINI.md and shared skills/
 New-Item -ItemType Directory -Force -Path "$HOME\.gemini\config" | Out-Null
-if (Test-Path "$HOME\.gemini\config\GEMINI.md") { Remove-Item "$HOME\.gemini\config\GEMINI.md" -Force }
-if (Test-Path "$HOME\.gemini\config\skills") { Remove-Item -Recurse -Force "$HOME\.gemini\config\skills" }
-New-Item -ItemType HardLink -Path "$HOME\.gemini\config\GEMINI.md" -Target "$HOME\ai-skills-config\gemini\GEMINI.md"
-cmd /c mklink /J "$HOME\.gemini\config\skills" "$HOME\ai-skills-config\gemini\skills"
-```
+Remove-Item "$HOME\.gemini\config\GEMINI.md" -Force -ErrorAction SilentlyContinue
+New-Item -ItemType HardLink -Path "$HOME\.gemini\config\GEMINI.md" -Target "$HOME\ai-skills-config\gemini\GEMINI.md" | Out-Null
+cmd /c rmdir "$HOME\.gemini\config\skills" 2>$null
+cmd /c mklink /J "$HOME\.gemini\config\skills" "$HOME\ai-skills-config\skills"
 
----
-
-## Step 3: Connect Claude Directly to `ai-skills-config\claude`
-
-```powershell
+# 3. Link Claude directly to claude/CLAUDE.md, claude/agents/, and shared skills/
 New-Item -ItemType Directory -Force -Path "$HOME\.claude" | Out-Null
-if (Test-Path "$HOME\.claude\CLAUDE.md") { Remove-Item "$HOME\.claude\CLAUDE.md" -Force }
-if (Test-Path "$HOME\.claude\skills") { cmd /c rmdir "$HOME\.claude\skills" }
-if (Test-Path "$HOME\.claude\agents") { cmd /c rmdir "$HOME\.claude\agents" }
-New-Item -ItemType HardLink -Path "$HOME\.claude\CLAUDE.md" -Target "$HOME\ai-skills-config\claude\CLAUDE.md"
-cmd /c mklink /J "$HOME\.claude\skills" "$HOME\ai-skills-config\claude\skills"
+Remove-Item "$HOME\.claude\CLAUDE.md" -Force -ErrorAction SilentlyContinue
+New-Item -ItemType HardLink -Path "$HOME\.claude\CLAUDE.md" -Target "$HOME\ai-skills-config\claude\CLAUDE.md" | Out-Null
+cmd /c rmdir "$HOME\.claude\skills" 2>$null
+cmd /c mklink /J "$HOME\.claude\skills" "$HOME\ai-skills-config\skills"
+cmd /c rmdir "$HOME\.claude\agents" 2>$null
 cmd /c mklink /J "$HOME\.claude\agents" "$HOME\ai-skills-config\claude\agents"
 ```
