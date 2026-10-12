@@ -1,0 +1,12 @@
+{
+  "name": "mission-control",
+  "displayName": "Agent Mission Control",
+  "version": "1.0.0",
+  "description": "Real-time Multi-Agent Mission Control panel for Gemini (Antigravity) and Claude Code across all chats and workspaces. View live status, pending approvals, elapsed runtime, planned todo checklists, work completed, and Start/Stop agents with 1 click.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Open Agent Mission Control to inspect all running Gemini and Claude agents",
+    "Show which agents are waiting for my approval across workspaces",
+    "Update the planned todo list for this conversation"
+  ]
+}

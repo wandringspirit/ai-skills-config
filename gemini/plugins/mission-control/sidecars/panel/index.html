@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Mission Control — Gemini &amp; Claude Fleet</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/preload.js"></script>
+</head>
+<body>
+  <div class="mc-shell">
+    <!-- Top Header & Fleet Telemetry Bar -->
+    <header class="mc-header">
+      <div class="mc-brand">
+        <div class="mc-logo" aria-hidden="true">
+          <span class="mc-logo-dot"></span>
+        </div>
+        <div>
+          <div class="mc-title-row">
+            <h1>Agent Mission Control</h1>
+            <span id="live-indicator" class="live-pill">LIVE SYNC • 3s</span>
+          </div>
+          <p class="mc-subtitle">Unified Multi-Chat Command Center for Gemini (Antigravity) &amp; Claude</p>
+        </div>
+      </div>
+
+      <div class="mc-stats">
+        <div class="stat-chip">
+          <span class="stat-label">Total Fleet</span>
+          <strong id="stat-total">0</strong>
+        </div>
+        <div class="stat-chip running">
+          <span class="stat-label">Running Now</span>
+          <strong id="stat-running">0</strong>
+        </div>
+        <div class="stat-chip approval" id="stat-approval-chip">
+          <span class="stat-label">Pending Approval</span>
+          <strong id="stat-approval">0</strong>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-label">Gemini / Claude</span>
+          <strong id="stat-engines">0 / 0</strong>
+        </div>
+      </div>
+
+      <div class="mc-header-actions">
+        <button id="btn-new-agent" class="btn primary">+ New Agent Task</button>
+        <button id="btn-refresh" class="btn ghost" title="Refresh fleet now">↻ Refresh</button>
+        <a id="btn-open-browser" href="http://localhost:4400" target="_blank" rel="noopener" class="btn ghost" title="Open full-screen in browser">↗ Full Screen</a>
+      </div>
+    </header>
+
+    <!-- Main Split Workspace: Left Fleet List + Right Deep-Dive Inspector -->
+    <div class="mc-main">
+      <!-- Left Column: Agent Fleet List -->
+      <aside class="mc-sidebar">
+        <div class="mc-filter-bar">
+          <div class="filter-tabs" id="filter-tabs">
+            <button class="filter-tab active" data-filter="all">All</button>
+            <button class="filter-tab" data-filter="pending_approval">🟡 Approval</button>
+            <button class="filter-tab" data-filter="running">🟢 Running</button>
+            <button class="filter-tab" data-filter="gemini">Gemini</button>
+            <button class="filter-tab" data-filter="claude">Claude</button>
+          </div>
+          <input
+            type="search"
+            id="search-input"
+            class="search-input"
+            placeholder="Filter by chat, project, role, or skill..."
+          />
+        </div>
+
+        <div id="agent-list" class="agent-list" role="list">
+          <div class="empty-state">Scanning local Gemini &amp; Claude sessions...</div>
+        </div>
+      </aside>
+
+      <!-- Right Column: Selected Agent Inspector -->
+      <main class="mc-inspector" id="inspector">
+        <div id="inspector-empty" class="inspector-empty">
+          <h2>Select an Agent from the Fleet</h2>
+          <p>Click any Gemini or Claude agent on the left to inspect its live status, pending approvals, planned todo list, and completed work history.</p>
+        </div>
+
+        <div id="inspector-content" class="inspector-content" hidden>
+          <!-- Inspector Top Banner -->
+          <section class="inspector-header card">
+            <div class="inspector-header-top">
+              <div class="inspector-badges">
+                <span id="insp-engine-badge" class="engine-badge gemini">GEMINI</span>
+                <span id="insp-status-badge" class="status-badge running">🟢 RUNNING</span>
+                <span id="insp-pid-badge" class="meta-pill" hidden>PID: —</span>
+                <span id="insp-cost-badge" class="meta-pill" hidden>$0.00</span>
+              </div>
+
+              <div class="inspector-controls">
+                <button id="btn-insp-approve" class="btn warning" hidden>✓ Approve Pending</button>
+                <button id="btn-insp-start" class="btn success">▶ Start / Resume</button>
+                <button id="btn-insp-stop" class="btn danger">■ Stop Agent</button>
+                <button id="btn-insp-flag" class="btn ghost" title="Flag this agent as waiting for your approval">⚑ Flag Approval</button>
+                <button id="btn-insp-jump" class="btn ghost" hidden>↗ Switch to Chat</button>
+              </div>
+            </div>
+
+            <div class="inspector-title-block">
+              <h2 id="insp-title">Agent Title</h2>
+              <div class="inspector-role-row">
+                <span class="role-label">Job / Role:</span>
+                <strong id="insp-role" class="role-value">Autonomous Engineer</strong>
+                <button id="btn-edit-role" class="btn-inline">✎ Edit Role &amp; Job</button>
+              </div>
+            </div>
+
+            <!-- Inline Role / Mission Editor (Hidden by default) -->
+            <div id="role-editor" class="role-editor" hidden>
+              <div class="form-row">
+                <label>Display Title</label>
+                <input type="text" id="edit-title-input" />
+              </div>
+              <div class="form-row">
+                <label>Agent Role / Job Title</label>
+                <input type="text" id="edit-role-input" />
+              </div>
+              <div class="form-row">
+                <label>Mission / Job Description</label>
+                <textarea id="edit-job-input" rows="2"></textarea>
+              </div>
+              <div class="form-actions">
+                <button id="btn-save-role" class="btn primary">Save Details</button>
+                <button id="btn-cancel-role" class="btn ghost">Cancel</button>
+              </div>
+            </div>
+
+            <!-- Key Runtime Metadata Grid -->
+            <div class="meta-grid">
+              <div class="meta-box">
+                <span class="meta-label">Running Since</span>
+                <strong id="insp-started-at">—</strong>
+                <span id="insp-elapsed" class="meta-sub">Elapsed: —</span>
+              </div>
+              <div class="meta-box">
+                <span class="meta-label">Last Activity</span>
+                <strong id="insp-updated-at">—</strong>
+                <span id="insp-steps" class="meta-sub">0 steps logged</span>
+              </div>
+              <div class="meta-box">
+                <span class="meta-label">Workspace / Project</span>
+                <strong id="insp-workspace" class="mono">—</strong>
+                <span id="insp-session-id" class="meta-sub mono">ID: —</span>
+              </div>
+              <div class="meta-box">
+                <span class="meta-label">Active Skills</span>
+                <div id="insp-skills" class="skills-wrap">—</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Pending Approval Alert Box (Only visible when agent needs user approval) -->
+          <section id="approval-banner" class="approval-banner card" hidden>
+            <div class="approval-header">
+              <div>
+                <span class="approval-tag">⚠ ACTION REQUIRED • PENDING YOUR APPROVAL</span>
+                <h3 id="approval-title">Agent is waiting for your confirmation</h3>
+              </div>
+              <button id="btn-banner-approve" class="btn warning">✓ Approve &amp; Continue</button>
+            </div>
+            <p id="approval-desc" class="approval-desc"></p>
+            <div id="approval-options" class="approval-options"></div>
+          </section>
+
+          <!-- What's Happening Right Now + Job Assignment -->
+          <div class="inspector-two-col">
+            <section class="card">
+              <div class="section-header">
+                <h3>⚡ What's Happening Right Now</h3>
+                <span id="insp-live-dot" class="pulse-dot"></span>
+              </div>
+              <div class="live-action-box">
+                <div class="live-action-title" id="insp-current-action">—</div>
+                <p class="live-thinking" id="insp-thinking">No active reasoning trace.</p>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="section-header">
+                <h3>🎯 Agent Job &amp; Current Directive</h3>
+              </div>
+              <div class="job-box">
+                <div class="job-field">
+                  <span class="job-label">Assigned Mission / Role Summary:</span>
+                  <p id="insp-job-desc">—</p>
+                </div>
+                <div class="job-field">
+                  <span class="job-label">Latest User Prompt:</span>
+                  <p id="insp-latest-prompt" class="job-quote">—</p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Two-Column Lower: Planned Todo Queue + Work Completed Timeline -->
+          <div class="inspector-two-col">
+            <!-- Planned Todo List -->
+            <section class="card">
+              <div class="section-header">
+                <div>
+                  <h3>📋 What's Planned (Todo &amp; Roadmap)</h3>
+                  <p class="section-sub">Click any item to cycle status: Pending → In Progress → Done</p>
+                </div>
+                <span id="todo-progress-pill" class="meta-pill">0 / 0 Done</span>
+              </div>
+
+              <div class="todo-progress-bar">
+                <div id="todo-progress-fill" class="todo-progress-fill" style="width: 0%"></div>
+              </div>
+
+              <div class="todo-add-row">
+                <input
+                  type="text"
+                  id="new-todo-input"
+                  placeholder="Add a planned task or next step for this agent..."
+                />
+                <button id="btn-add-todo" class="btn primary">+ Add Todo</button>
+              </div>
+
+              <ul id="todo-list" class="todo-list"></ul>
+            </section>
+
+            <!-- Work Completed So Far -->
+            <section class="card">
+              <div class="section-header">
+                <div>
+                  <h3>✅ Work Completed Till Now</h3>
+                  <p class="section-sub">Live chronological history of tools, edits &amp; commands</p>
+                </div>
+                <span id="work-count-pill" class="meta-pill">0 actions</span>
+              </div>
+
+              <div id="work-timeline" class="work-timeline"></div>
+            </section>
+          </div>
+
+          <!-- Direct Instruction / Command Bar -->
+          <section class="card command-bar">
+            <div class="section-header">
+              <h3>💬 Send Instruction / Prompt to Agent</h3>
+              <span class="section-sub" id="send-hint">Updates agent directive &amp; dispatches message</span>
+            </div>
+            <div class="command-input-row">
+              <input
+                type="text"
+                id="agent-message-input"
+                placeholder="Type next instruction, approval note, or task for this agent..."
+              />
+              <button id="btn-send-message" class="btn primary">Send &amp; Run ▶</button>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal: Launch / Register New Agent Task -->
+  <div id="new-agent-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🚀 Launch / Register New Agent Mission</h3>
+        <button id="btn-close-modal" class="btn-inline">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>AI Engine</label>
+          <select id="new-agent-engine">
+            <option value="gemini">Gemini (Antigravity Session)</option>
+            <option value="claude">Claude Code (Background CLI Agent)</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Agent Title</label>
+          <input type="text" id="new-agent-title" placeholder="e.g., Programmatic SEO Route Builder" />
+        </div>
+        <div class="form-row">
+          <label>Role / Job Title</label>
+          <input type="text" id="new-agent-role" placeholder="e.g., SEO &amp; Content Engineer" />
+        </div>
+        <div class="form-row">
+          <label>Workspace Directory</label>
+          <input type="text" id="new-agent-workspace" value="c:\Projects\ring-size" />
+        </div>
+        <div class="form-row">
+          <label>Mission Prompt / Job Instructions</label>
+          <textarea id="new-agent-prompt" rows="3" placeholder="Describe what this agent should build or research..."></textarea>
+        </div>
+        <div class="form-row">
+          <label>Planned Todo Checklist (one per line)</label>
+          <textarea id="new-agent-todos" rows="3" placeholder="Research target keywords&#10;Generate route templates&#10;Run vitest suite"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-new-agent" class="btn ghost">Cancel</button>
+        <button id="btn-confirm-new-agent" class="btn primary">Launch Agent ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>

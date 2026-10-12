@@ -1,0 +1,18 @@
+{
+  "command": "node",
+  "args": ["main.mjs"],
+  "restart_policy": "always",
+  "display_name": "Agent Mission Control",
+  "description": "Live multi-agent fleet dashboard for Gemini & Claude sessions with Pending Approval alerts, Planned Todo checklists, Work Completed timeline, and Start/Stop controls.",
+  "has_web_ui": true,
+  "ui_config": {
+    "display_name": "Mission Control",
+    "views": [
+      {
+        "path": "/",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "title": "Mission Control"
+      }
+    ]
+  }
+}
