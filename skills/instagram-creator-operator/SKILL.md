@@ -37,3 +37,16 @@ description: >-
 
 5. **Human-in-the-Loop Approval Gate**:
    - Always preview or list the planned Reel video, thumbnail, caption, and schedule time for user approval before clicking `Publish` or `Schedule` on the live Instagram account (unless the user explicitly approves a batch of posts to be published/scheduled).
+
+6. **Meta Business Suite Browser Automation SOP (Zero-Dialog, Zero-Timeout Pattern)**:
+   - **Persistent Local File Bridge (`127.0.0.1:8766`)**:
+     - Run `node instagram-studio/scripts/ig_bridge.js` with `IsDaemon: true` so Windows Job Object keeps it alive across turns.
+     - `business.facebook.com` allows `http://127.0.0.1:*` in `script-src` when the page's CSP `nonce` (`document.querySelector('script[nonce], style[nonce]')`) is copied onto the injected `<script>` tag.
+   - **Attaching Videos & Multi-Slide Carousels Without Native File Dialogs**:
+     - Never make `<input type="file">` visible on screen or click `"Add video"` via coordinate-based `mcp_chrome_devtools_click`.
+     - Override `HTMLInputElement.prototype.click` and `HTMLInputElement.prototype.showPicker` to capture `this` into `window.__lastFileInput`, attach `File` objects via `DataTransfer`, and dispatch **both** `new Event('input', { bubbles: true })` (required by Meta's `useFileInput` hook on `reels_composer`) and `new Event('change', { bubbles: true })`.
+   - **Setting Captions & Schedule Dates Synchronously (`waitForStableDom: false`)**:
+     - Never call `mcp_chrome_devtools_click` or `mcp_chrome_devtools_type_text` while a video is uploading (upload progress bars mutate the DOM every 100ms and trigger 60s `waitForStableDom` timeouts).
+     - Set captions in 1ms via Meta's Draft.js fiber (`window.require('ContentState')` + `window.require('EditorState').push(p.editorState, newContent, 'insert-characters')` -> `p.onChange(newState)`).
+     - Set schedule date & time via the `input[placeholder="dd/mm/yyyy"]` React fiber `onChange(p.value.set({ year, month, day, hour, minute, second: 0 }))`.
+
