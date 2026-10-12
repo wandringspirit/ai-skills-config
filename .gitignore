@@ -1,0 +1,11 @@
+# Ignore machine-local state, caches, and auth configs
+*
+!.gitignore
+!README.md
+!GEMINI.md
+!AGENTS.md
+!skills.json
+!skills/
+!skills/**
+!rules/
+!rules/**
