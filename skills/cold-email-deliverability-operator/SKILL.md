@@ -180,6 +180,22 @@ For bootstrapped founders, solopreneurs, and pilots targeting 30–100 prospects
   - Delivers **95%+ Primary Inbox placement** (zero sequencer tracking pixels).
   - Produces a **15%–25% reply rate** (vs. 1%–2% on mass automated blasts).
 
+### F. Free Email Warmup Tools & Sequencer Comparison (2024–2026 Landscape)
+1. **AutoMailer (automailer.io):**
+   - **Verdict:** Highly viable free alternative to Instantly/Smartlead for bootstrapping.
+   - **Strengths:** Free forever tier with unlimited connected inboxes, sequence builder, dynamic Spintax support, and inbox rotation without upfront credit card requirements.
+   - **Caution:** Turn OFF open/click tracking on cold step #1 (to eliminate shared redirect tracking penalties), enforce plain text copy, and keep daily output to 15–20 emails/day per connected inbox.
+2. **TrulyInbox (Free Forever Plan):**
+   - 1 mailbox, ~10 warmup emails/day. Free peer network with SPF/DKIM/DMARC health verification and spam folder rescue.
+3. **Mailflow.io (Originally QuickMail Auto-Warmer):**
+   - Free pool tier supporting 5–10 warmup emails/day per inbox. Threaded real peer conversations.
+4. **Mails.ai (Free Plan):**
+   - Pre-warmed workspace routing with 3,000 free events/month.
+5. **E-Warmup (Free Forever Tier):**
+   - 1 mailbox, 10 warmup sends/day, plus 5 free deliverability audits/month.
+6. **Apollo.io (Free Plan):**
+   - Includes sequence builder + Warmbox-powered automated mailbox ramp-up pacing.
+
 ---
 
 ## Gemini (Antigravity) Execution SOP
