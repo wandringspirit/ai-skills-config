@@ -14,7 +14,7 @@ Standalone, zero-duplication repository for **Gemini (Antigravity)** and **Claud
 ```text
 C:\Users\piyus\ai-skills-config\
 ├── README.md
-├── skills\                             <-- Single shared source for all 21 skills (Zero Duplication)
+├── skills\                             <-- Single shared source for all 22 skills (Zero Duplication)
 │   ├── agents-sdk\SKILL.md
 │   ├── cloudflare\SKILL.md
 │   ├── instagram-creator-operator\SKILL.md
