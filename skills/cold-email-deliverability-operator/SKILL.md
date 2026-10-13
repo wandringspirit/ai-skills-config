@@ -185,9 +185,9 @@ For bootstrapped founders, solopreneurs, and pilots targeting 30–100 prospects
    - **Verdict:** Highly viable free alternative to Instantly/Smartlead for bootstrapping.
    - **Strengths:** Free forever tier with unlimited connected inboxes, sequence builder, dynamic Spintax support, and inbox rotation without upfront credit card requirements.
    - **Caution:** Turn OFF open/click tracking on cold step #1 (to eliminate shared redirect tracking penalties), enforce plain text copy, and keep daily output to 15–20 emails/day per connected inbox.
-2. **TrulyInbox (Free Forever Plan):**
-   - 1 mailbox, ~10 warmup emails/day. Free peer network with SPF/DKIM/DMARC health verification and spam folder rescue.
-3. **Mailflow.io (Originally QuickMail Auto-Warmer):**
+2. **TrulyInbox (⚠️ WARNING: Changed to 7-Day Trial Only):**
+   - **Caution:** TrulyInbox previously advertised a free tier, but now converts all new accounts to a strict **7-Day Free Trial** that locks and demands paid upgrades. **Do NOT pick TrulyInbox for free bootstrap setups**; email warmup requires 14–21 continuous days to build inbox reputation.
+3. **Mailflow.io (Originally QuickMail Auto-Warmer — Recommended $0 Option):**
    - Free pool tier supporting 5–10 warmup emails/day per inbox. Threaded real peer conversations.
 4. **Mails.ai (Free Plan):**
    - Pre-warmed workspace routing with 3,000 free events/month.
