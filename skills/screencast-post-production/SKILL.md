@@ -52,6 +52,13 @@ Use a GPU encoder when present (`h264_nvenc -preset p5 -rc vbr -cq 21 -b:v 0`), 
 AAC 192k, `-movflags +faststart`. Check frames from the output: subtitle placement, blur,
 text sharpness.
 
+**Splicing a re-recorded section.** Cut the first take in the silence just before the re-recorded
+line's first word (from its word timestamps). Enhance and transcribe the new take on its own, then
+join both in one `filter_complex`: `trim`/`atrim` the first take, `fps` and `setsar=1` on both video
+inputs, 0.15 s `afade` out and in at the seam, `concat=n=2:v=1:a=1`, and burn one combined ASS
+afterwards with the second take's cues offset by the cut point. Drop any correction notes that
+belonged to the replaced section.
+
 ---
 
 ## Gemini (Antigravity) Execution SOP
