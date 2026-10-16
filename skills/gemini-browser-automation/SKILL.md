@@ -26,7 +26,7 @@ Automating the Gemini web application enables:
 When the user already has Google Chrome open with their authenticated Google account:
 1. Chrome must be launched with remote debugging enabled:
    ```cmd
-   "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --remote-allow-origins=*
    ```
 2. Playwright attaches via CDP:
    ```python
