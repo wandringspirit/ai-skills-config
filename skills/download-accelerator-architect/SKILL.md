@@ -37,7 +37,21 @@ A high-performance download manager splits downloads into concurrent segments us
        - The idle connection issues a new `Range` request for the second half.
      - This ensures all available network threads remain saturated at 100% until the final byte is delivered.
 
-### 1.2 Zero-Copy Direct-to-Disk Offset Writing
+### 1.2 On-The-Fly Concurrency Scaling (Live Slider 1–64 Threads)
+Modern accelerators allow users to dynamically change thread counts *during* an active download without restarting or losing progress:
+- **Scale Up (e.g. 16 -> 32/64 threads)**:
+  - Inspect all active segments with remaining unfinished bytes > 512 KB.
+  - Sort segments descending by unread remaining size.
+  - Bisect the largest segments into two halves: shrink the current segment's boundary and instantiate a new child segment with its own HTTP worker thread for the upper half.
+  - Sockets open immediately and start writing directly to their allocated file offsets.
+- **Scale Down (e.g. 64 -> 16 threads)**:
+  - Gracefully abort excess active worker threads (`req.destroy()`).
+  - Extend the boundaries of adjacent remaining segments to absorb the aborted ranges or re-enqueue them for the surviving threads to finish.
+- **Live UI Controls**:
+  - Continuous slider (1 to 64) with live badge indicators (`[Ultra Turbo]` for >32, `[IDM Default]` for 32, `[Balanced]` for 16, `[Safe]` for 8).
+  - One-click preset pills for instant switching without drag friction.
+
+### 1.3 Zero-Copy Direct-to-Disk Offset Writing
 Many amateur download managers download chunks into separate temporary files (`part1.tmp`, `part2.tmp`, etc.) and then perform a slow, disk-thrashing concatenation phase at the end (which can take minutes on 50GB files).
 
 A production-grade accelerator uses **Single-File Pre-Allocation with Direct Absolute Offset Writes**:
