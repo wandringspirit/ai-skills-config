@@ -42,6 +42,17 @@ Whenever the user shares an Ads Manager screenshot or asks *"Are these settings 
 5. **Unpublished Draft Changes Check:**
    - Check the top-right corner of Ads Manager (`Review and publish` button). If it is active/highlighted or has pending edits, remind the user whether any draft edits are waiting to be published.
 
+### C. Mandatory Indian GST & Real Bank Cashflow Protocol (Strict Rule)
+1. **Never conflate "Media Spend" with "Actual Cash Spent":**
+   - In India, Meta levies **18% Goods & Services Tax (GST)** on all ad spend / prepaid deductions.
+   - `Actual Bank Cash Outflow = Media Spend in Ads Manager × 1.18`.
+2. **Zero-Delusion Profit & Loss Reporting:**
+   - Whenever reporting profit, loss, deficit, or breakeven to the user, **ALWAYS calculate and lead with the Real Bank Cash Position (including 18% GST)**.
+   - **STRICTLY PROHIBITED:** Never claim a campaign is "in net profit", "paying for itself", or "generating cash" unless `Total Revenue Collected > (Total Media Spend × 1.18)`.
+   - Always display the dual-ledger truth table:
+     - **Dashboard Ad Level (Auction Efficiency):** `Media Spend vs. Revenue` (Platform ROAS).
+     - **Bank Cash Reality (Take-Home Solopreneur Truth):** `Total Cash Deducted (Media + 18% GST) vs. Razorpay Cash Collected`.
+
 ---
 
 ## Gemini (Antigravity) Execution SOP
