@@ -31,6 +31,11 @@ description: >-
 - **One follow-up at most**, and only with something new (for example, the PR itself after an
   unanswered issue).
 - Never open the PR or comment from the agent; the user posts under their own account.
+- **Merged is not live.** On a site built from source (R Markdown, Jekyll, Quarto), the merge changes
+  the source only; the published page keeps the old link until the owner rebuilds. Count the link
+  when the live URL shows it (`curl -s <page> | grep <domain>`), not when the PR merges, and don't
+  nudge about the rebuild. Example: a professor's syllabus PR merged 11 days after it was opened, and
+  the published FAQ still showed the dead link the next morning.
 
 ## 3. Be honest about the yield
 
