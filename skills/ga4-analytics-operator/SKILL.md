@@ -43,6 +43,7 @@ C:\Users\piyus\.config\ga-mcp\ga4-reader.json
 | Property Name | Property ID | Default Timezone | Measurement ID | Primary Domain |
 |---|---|---|---|---|
 | **Playlist Duration** | `555350015` | `Asia/Kolkata` | `G-3GVL76L9HK` | `https://playlistduration.com` |
+| **gearsizing.com** | `561698753` | `Asia/Kolkata` | `G-Q4V0B9HZY4` | `https://gearsizing.com` |
 
 ---
 
