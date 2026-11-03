@@ -58,6 +58,43 @@ Defence direct entries (CDS, AFCAT, SSC Tech) close at 24–27: rule them out fo
 - Branch-agnostic routes: UPSC CSE (choose any optional), UPSC EPFO APFC (any graduate, UR 35 as on
   closing date; irregular notices), RBI Grade B General, state PSCs, SBI/IBPS PO.
 
+## 3a. Competition data (last completed cycles, from news/coaching reports; refresh each year)
+
+| Exam (cycle) | Applied | Appeared | Seats | Seats ÷ base |
+|---|---|---|---|---|
+| UPSC CSE 2026 | ~8.19 lakh | ~5.49 lakh | 1,016 | 1 in ~540 appeared |
+| SEBI Grade A 2025 | 86,588 (all streams) | not published | ~110–135 (IT ~21–22) | 1 in ~650–800 applied |
+| RBI Grade B 2025 (General) | 1,07,045 | not published | 83 General (120 total) | 1 in ~1,290 applied |
+| NABARD Grade A 2025 | 52,946 | not published | 91 | 1 in ~580 applied |
+| SIDBI Grade A 2025 | not found | — | 50 | — |
+| IRDAI AM 2024 | not found | — | 49 | — |
+| SSC CGL 2025 | 28.15 lakh | ~13.77 lakh | 14,582 | 1 in ~95 appeared (top posts need top ranks) |
+| UPSC EPFO APFC 2026 | not found | — | 80 | — |
+| UPPSC PCS 2026 | not found | — | ~500 | — |
+
+Always say raw ratios overstate difficulty: most applicants are unprepared (only ~60–67% even turn up
+for CSE, and ~13k of 5.5 lakh clear prelims). Odds for a serious, well-prepared candidate are far higher.
+
+## 3b. What the regulator / DFI Grade A officer does
+
+- **SEBI** (securities regulator, mostly Mumbai): inspections of brokers/AMCs, enforcement, market
+  surveillance; IT stream runs SEBI's systems, cyber-security and IT audits of market intermediaries.
+- **RBI Grade B**: monetary policy support, bank/NBFC supervision, regulation, currency management.
+- **NABARD** (rural development bank): refinance to rural/cooperative banks, project appraisal,
+  District Development Manager postings in rural districts.
+- **SIDBI** (MSME development bank): lending/refinance to MSMEs, fintech/startup fund schemes.
+- **IRDAI** (insurance regulator, HQ Hyderabad): licensing insurers, solvency monitoring, grievances.
+
+## 3c. "Income Tax Officer" and similar asks
+
+- ITO (Group B) is **promotion-only**; no direct exam. Entry routes:
+  - SSC CGL → Inspector of Income Tax (Level 7, ₹44,900 basic) → ITO after ~5–10 years.
+  - UPSC CSE → IRS (Income Tax) → Assistant Commissioner directly (Group A, Level 10), senior to ITO.
+- Same pattern: GST/Customs Inspector (CGL) vs IRS (Customs & Indirect Taxes) via CSE; ED Assistant
+  Enforcement Officer and CBI Sub-Inspector via CGL (20–30).
+- Bank/insurance officer exams for graduates up to 30: SBI PO (as on 1 Apr), IBPS PO (1 Aug),
+  LIC AAO, plus PFRDA / IFSCA Grade A (both have IT streams; verify branch rules).
+
 ## 4. Fit heuristics for a software professional
 
 - **Tech-aligned, highest ROI:** SEBI Grade A IT, RBI Grade B / RBI IT officer posts, NIC Scientist-B,
