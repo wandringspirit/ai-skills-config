@@ -18,8 +18,11 @@ description: Apply to affiliate networks (AvantLink, Impact, Amazon Associates, 
 ### 2. What reviewers look at
 - A finished site: no lorem ipsum, no empty pages, About, Contact, Privacy Policy, affiliate disclosure page or line.
 - Relevant content for the merchant's products (sizing guides for ski/bike shops fit well).
-- Some traffic helps but is rarely a hard minimum for AvantLink/Impact. REI is known to be selective;
-  rejection is cheap: reapply after traffic grows.
+- Traffic: Impact verified and queued a days-old site; **AvantLink refused one** (gearsizing.com, India,
+  4 days live, ~0 visitors, Nov 2026: "website or affiliate model did not appear to be a fit"). AvantLink
+  accepts under 30% of applicants, so apply there only once reads show steady US visitors (or with a
+  written invitation from a merchant, which the refusal email says to reply with). REI is selective too.
+- A refusal is cheap: no penalty seen, reapply after traffic grows. Don't argue by reply.
 - A short honest description: site purpose, audience countries, traffic source (organic search), how links
   will be used (in-content links on calculators and size charts), monthly visitors (state the real number).
 - Never: coupon/incentive traffic, brand-term paid search, or email to lists unless the merchant allows it.
