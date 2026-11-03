@@ -50,6 +50,13 @@ Defence direct entries (CDS, AFCAT, SSC Tech) close at 24–27: rule them out fo
 - SBI/bank lateral IT roles (Deputy/Assistant Manager Systems) often require CS/IT/ECE or MCA plus
   years of experience; read the qualification line.
 - ESE and GATE-based PSUs take the degree branch, not the job domain: an EE grad in software writes EE.
+- NIC Scientist-B (2026: CS/IT, ECE, Data Science/AI via GATE) and NABARD Grade A IT stream (CS/IT/ECE
+  family) leave out Electrical; NABARD puts EE in its own Electrical stream.
+- DRDO RAC matches the GATE paper to the degree discipline, so an EE grad cannot enter via GATE CS.
+- SEBI Grade A IT stream (2024, 2025 notices) accepts a B.E./B.Tech in **any** branch, which makes it the
+  main tech-aligned regulator route for non-CS engineers working in software.
+- Branch-agnostic routes: UPSC CSE (choose any optional), UPSC EPFO APFC (any graduate, UR 35 as on
+  closing date; irregular notices), RBI Grade B General, state PSCs, SBI/IBPS PO.
 
 ## 4. Fit heuristics for a software professional
 
