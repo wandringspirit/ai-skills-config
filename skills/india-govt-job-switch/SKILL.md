@@ -92,6 +92,13 @@ for CSE, and ~13k of 5.5 lakh clear prelims). Odds for a serious, well-prepared 
   - UPSC CSE → IRS (Income Tax) → Assistant Commissioner directly (Group A, Level 10), senior to ITO.
 - Same pattern: GST/Customs Inspector (CGL) vs IRS (Customs & Indirect Taxes) via CSE; ED Assistant
   Enforcement Officer and CBI Sub-Inspector via CGL (20–30).
+- SSC CGL detail: Tier 1 screening, then Tier 2 Paper 1 (Maths 90, Reasoning 90, English 135, GA 75 marks;
+  +3/−1; Computer module and DEST qualifying per most sources) decides merit. Inspector/AEO/CBI SI/ASO are
+  Level 7 (₹44,900 basic). 2025 final cut-offs reported (column labels unclear): Income Tax Inspector
+  ~342, CBI SI ~330 of 390. CBIC Inspector/Examiner/Preventive posts and CBI SI have physical standards
+  and tests (walk 1.6 km/15 min, cycle 8 km/30 min for CBIC; height 165 cm men for CBI SI). Promotion to
+  ITO/Superintendent is slow and region-dependent (often 8–15 years); ED/CBI carry all-India transfer.
+  Notification ~Mar–Jun, final result ~11 months later, so joining is ~1.5 years after notification.
 - Bank/insurance officer exams for graduates up to 30: SBI PO (as on 1 Apr), IBPS PO (1 Aug),
   LIC AAO, plus PFRDA / IFSCA Grade A (both have IT streams; verify branch rules).
 
