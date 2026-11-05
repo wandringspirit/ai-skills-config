@@ -40,6 +40,9 @@ description: Apply to affiliate networks (AvantLink, Impact, Amazon Associates, 
   around the 23rd–25th, only after the merchant has paid AvantLink. Impact pays by bank/PayPal with a
   ~$10–25 threshold. For Indian bank transfers: bank name, account number, IFSC, SWIFT/BIC, account name exactly
   as on PAN.
+- Payoneer asks Indian users for an IEC (Import Export Code). Its support said in writing (Nov 2026) that an individual
+  receiving Amazon Associates commissions can ignore it: not mandatory, not reviewed, no effect on payments. Don't pay for one;
+  ask support on a ticket first and keep the reply.
 - No GST/company registration is needed to apply. In India: commissions are taxable business income
   (ITR-3/ITR-4 with 44ADA/44AD if eligible); keep FIRA/FIRC or bank advice for each foreign credit;
   PayPal India needs a purpose code (see `paypal-india-merchant-operator`). GST registration only above
