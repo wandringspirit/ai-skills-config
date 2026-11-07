@@ -50,3 +50,8 @@ description: >-
      - Set captions in 1ms via Meta's Draft.js fiber (`window.require('ContentState')` + `window.require('EditorState').push(p.editorState, newContent, 'insert-characters')` -> `p.onChange(newState)`).
      - Set schedule date & time via the `input[placeholder="dd/mm/yyyy"]` React fiber `onChange(p.value.set({ year, month, day, hour, minute, second: 0 }))`.
 
+7. **Mandatory Reels Hook Standard: 100% Fluid Dance Motion (Strict Rule)**:
+   - **Carousels Only for Stills:** Static image slides, infographics, and prompt comparisons are exclusively reserved for multi-slide 4:5 Carousel posts.
+   - **Reels Strict Mandate:** Whenever posting Reels, the hook character must **ALWAYS be physically dancing in real motion** in the style of the master winning reels (tasteful, alluring, rhythmic, high-energy movement: waist/hip sways, classical mudra turns, backless dress spins, radiant eye-contact smiles).
+   - **Zero Ken Burns Still Substitutions:** Never substitute static photos with zoom-and-pan effects as a Reel video hook. Reels must open with genuine fluid video movement.
+   - **100% Generic AI Model Terminology:** Spoken voiceovers, burned-in subtitles, and captions must use generic terminology ("hyper-realistic AI model", "virtual creator", "AI influencer") with zero geographic, ethnic, or regional tags.
