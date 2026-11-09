@@ -87,6 +87,16 @@ disconnect, plus a bug that multiplies size. Low day-trade margins make the bug 
   for margins or margin calls to overseas exchanges/counterparties are **not permitted** under LRS.
   Flag as a potential blocker; tell them to confirm with a FEMA-competent CA/lawyer and their AD bank.
   Prop-firm evaluation accounts are a different legal structure but often restrict bots/HFT — check rules.
+- **India resident trading through a foreign LLC (e.g. Wyoming LLC + Mercury):** the LLC does not
+  automatically cure the LRS issue. Ask: (a) whose name is the broker account in; (b) where did the
+  LLC's money come from (LRS remittance from India = ODI; foreign business revenue is different);
+  (c) were Form ODI / UIN / Annual Performance Report (due 31 Dec) / FLA filed. Under the FEMA
+  Overseas Investment Rules 2022, a resident individual's ODI must be in an operating entity with a
+  bona fide business and (per secondary sources) not in a "financial services activity" entity; a
+  vehicle whose main activity is trading its own capital is a grey area at best. Also flag: Schedule FA,
+  POEM if managed from India, and the US Form 5472 + pro forma 1120 (USD 25k penalty for
+  non-filing). Recommend a FEMA-competent CA before funding. Upside: a separate, capped bot account
+  is a useful hard loss boundary (futures losses can still exceed equity).
 - Tax: classification of trading income, foreign-asset reporting, TCS on remittances (verify).
 
 ## 7. Output format the user expects
