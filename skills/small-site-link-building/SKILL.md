@@ -31,7 +31,7 @@ For sites with no budget and no brand. Pair with `backlink-reclamation` (dead co
 | 2 | **Original data ("we compared X")**: a finding nobody else has, from your own tool or public data, pitched to writers who cover the niche | 0–10 links per study, lumpy | Journalists link data they can't get elsewhere. One clear headline number |
 | 3 | **Resource and "useful links" pages**: clubs, schools, associations, libraries, local programmes | 1 in 10–20 asks | Search `"<topic>" "useful links"`, `inurl:resources`, `inurl:links` |
 | 4 | **Broken-link / dead-competitor reclamation** | handful per dead tool | See `backlink-reclamation` |
-| 5 | **Journalist requests** (Source of Sources: free; Qwoted: free tier; Help a B2B Writer: free; Featured: paid). HARO/Connectively closed Dec 2024 | low, but high-authority | Answer only in your niche, with a specific number or method, within hours |
+| 5 | **Journalist requests** (Source of Sources: free; Qwoted: free tier; Help a B2B Writer: free; SourceBottle: free, UK/AU). Connectively closed Dec 2024; several 2026 roundups report Featured relaunched HARO as a free email digest in April 2025, so check pricing at signup | low, but high-authority | Answer only in your niche, with a specific number or method, within hours |
 | 6 | **Unlinked mentions**: pages that name the brand without a link | small | Only once the brand is mentioned anywhere |
 | 7 | **Community answers** (Reddit, forums) | nofollow | Traffic and AI-answer visibility, not ranking. Mostly no link (see `reddit-account-reputation-architect`) |
 
@@ -48,6 +48,12 @@ dozens. Rankings respond 1–3 months after links appear.
 - **Mass directory submission**: a few genuinely relevant, human-edited directories are fine; bulk
   lists are noise.
 - **Exact-match anchors everywhere**: let others choose the wording.
+- **Cross-linking the owner's own sites as a "network"**: Google can see common ownership (same
+  analytics, DNS/hosting account, author). A link between two of your own sites is fine only where a
+  reader of that page would want it (an About page "also by the same maker", or a genuinely related
+  tool); sitewide footer links, keyword anchors, or linking unrelated niches to pass authority is the
+  link-scheme/PBN pattern. Count on referral clicks from it, not ranking. New sites with near-zero
+  traffic have little authority to pass anyway.
 
 ## 4. Weekly routine (about 2–3 hours)
 
