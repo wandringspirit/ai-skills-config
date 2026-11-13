@@ -17,7 +17,8 @@ pretends to be official. The theme has to come from colour, structure and vocabu
 | Track lengths, release dates, track counts | Yes | Facts. From open data (MusicBrainz core data is CC0) |
 | Era nicknames fans use ("Red era", "Eras Tour") | Yes, as words | Same as titles: reference, not branding |
 | Colours that evoke an era (a red, a lavender, a gold) | Yes | Colours are not ownable as used here; build them in the site's tokens |
-| Album artwork, artist photos, tour posters | **No** | Copyright of the label or photographer. Not even thumbnails, not "fair use" |
+| Album artwork, tour posters, press or agency photos | **No** | Copyright of the label or photographer. Not even thumbnails, not "fair use" |
+| Photos of the artist that are **freely licensed** (Wikimedia Commons: CC0, CC BY, CC BY-SA) | Yes, credited | Credit photographer + licence + source link on the page; say "cropped and resized"; add a line that the photos don't imply endorsement (personality rights). Never "editorial use only" or unclear licences |
 | Logos, signature or wordmark lettering, the artist's own fonts | **No** | Trademark and font licences. Use the site's type |
 | Lyrics, even a line | **No** | Lyrics are licensed; quoting them invites takedowns and AdSense trouble |
 | "Official", the artist's handle as the page's identity, a fake verified look | **No** | Passing off. The page must never look like it comes from the artist or label |
@@ -54,6 +55,17 @@ endorsed by or connected to [Artist] or [label]."** Keep it in normal text, not 
 - **Date the numbers** ("counted on 13 November 2026 from MusicBrainz") and give the source a link.
 - Round consistently, and show hours *and* minutes for the headline (fans search "in hours and minutes").
 
+## 2b. Photos from Wikimedia Commons (when the owner wants the page to feel more like the artist)
+
+- Search the tour or era categories (e.g. `Category:The_Eras_Tour` and its subcategories) with the API
+  (`generator=categorymembers`, `prop=imageinfo`, `iiextmetadatafilter=LicenseShortName|Artist|ImageDescription`).
+  Flickr photographers often upload whole sets named by era or song, so one photo per era is usually there.
+- Keep only CC0 / CC BY / CC BY-SA. Download needs the owner's yes (name the files, source, total size).
+  Take Commons' own 900 px thumbnails, not the 5-20 MB originals.
+- Crop to one aspect ratio (3:4 works for cards), WebP about q74: 25-95 KB each. Self-host them; don't hotlink.
+- One credit line per photo (photographer linked to the Commons file page, licence linked), plus the
+  hero's credit under the photo itself.
+
 ## 4. Page shape
 
 1. H1 = the question fans type ("How long is Taylor Swift's discography?").
@@ -79,7 +91,15 @@ endorsed by or connected to [Artist] or [label]."** Keep it in normal text, not 
   `<site>/1.0 ( https://<site> )`; save raw JSON to the scratchpad, then write a small typed data module
   into the project. Run Python with `-I` and `sys.stdout.reconfigure(encoding="utf-8")`.
 - Check contrast with a script (relative luminance formula) for every text/background pair in both
-  themes before showing the page.
+  themes before showing the page. Measure in the browser only after injecting `transition:none`, or
+  colours read mid-transition (a false 1.7:1 in Nov 2026).
+- To choose photos, build a contact sheet: open `commons.wikimedia.org/wiki/Special:BlankPage` in the
+  browser pane and fill it by script from the API's `thumburl`s (iiurlwidth=200); screenshot and pick.
+- The in-app pane often can't screenshot below the first screen. Use headless Edge for full pages:
+  `msedge.exe --headless=new --hide-scrollbars --user-data-dir=<scratch> --window-size=1280,6600
+  --virtual-time-budget=8000 --screenshot=<png> <url>` (run from PowerShell with Start-Process -Wait),
+  then slice with PIL. Its narrowest window is wider than a phone; check 375 px in the pane with
+  `resize_window` preset mobile and `scrollWidth <= innerWidth`.
 - Follow the project's own rules for new pages and links from existing pages (ask before touching an
   existing page), commit by file name, and push only when the owner says so.
 
