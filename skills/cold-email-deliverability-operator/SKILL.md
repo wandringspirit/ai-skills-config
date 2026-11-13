@@ -198,6 +198,31 @@ For bootstrapped founders, solopreneurs, and pilots targeting 30–100 prospects
 
 ---
 
+## 5. Checking Where Your Emails Land (Inbox, Promotions, Spam)
+
+You cannot see a recipient's folders, so test with mailboxes you control or a seed-test service.
+
+1. **Seed test with your own accounts (free, most reliable for a personal Gmail):** send the exact pitch,
+   links included, to 2–3 addresses you own on different providers (a second Gmail, an Outlook.com,
+   a Yahoo). Don't open them first from the sender account. Note the folder: Primary / Promotions /
+   Spam (Outlook: Focused / Other / Junk). Repeat after any copy change.
+2. **mail-tester.com (free, 3 tests/day):** send to the one-time address it shows, get a /10 score with
+   SPF/DKIM/DMARC, blacklist and content checks. A plain Gmail sender usually scores 9–10; anything
+   below 8 names the fix.
+3. **Inbox-placement seed services:** GlockApps (a few free tests on signup) sends to ~30–80 seed
+   inboxes and reports Inbox / Promotions / Spam per provider. Warm-up tools (Mailivery, Instantly,
+   Lemwarm) also show an inbox-placement % from their own pool, but that pool is friendlier than real
+   recipients, so treat it as an upper bound.
+4. **Signals in your own mailbox:** bounce notices (`mailer-daemon`), replies landing, and Google's
+   "This message might be dangerous" or "Be careful with this message" warnings on test sends.
+5. **Domain senders only:** Google Postmaster Tools shows spam rate and reputation for a custom
+   domain sending 100+ emails/day to Gmail. It doesn't work for a `@gmail.com` sender.
+
+Gmail-specific: Promotions is triggered more by layout (HTML, images, many links, unsubscribe
+footers) than by words. A short plain-text note with one or two links usually lands in Primary.
+
+---
+
 ## Gemini (Antigravity) Execution SOP
 1. **Activation:**
    - Announce `**[Skill Active: cold-email-deliverability-operator]**`.
