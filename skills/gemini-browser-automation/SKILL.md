@@ -118,3 +118,13 @@ To upload reference images (e.g. Hazel's face ID or room template):
 1. Read existing generation parameters and script needs from persona folders.
 2. Delegate generation runs via Playwright CDP script runner.
 3. Validate output file sizes and report progress.
+
+### Claude desktop built-in browser pane (Nov 2026 notes)
+- **Full-size download.** The button label is now "Download full-sized image" (it used to be "Download full size image"), so match it with `/^Download full/i`. Intercept the `rd-gg` fetch the button fires, then fetch that URL yourself, with credentials, following text redirects, to get the 1536x2752 blob. Return it as base64 through `javascript_tool`; the oversized result is saved to a file, which a small script decodes.
+- **Seeding an edit.** Paste a `File` into `rich-textarea .ql-editor` with `new ClipboardEvent('paste', {clipboardData: dataTransfer})`. The CSP blocks fetching seeds from localhost, so a seed must be a blob already pulled from a chat. Old chats in the sidebar keep their results, so a lost session can be recovered by reopening them.
+- **Hidden or minimised window.** The page draws no frames, so pasted images don't attach, scripted clicks on Send and New chat are ignored, and loops stall.
+  - Take a small `screenshot` after each step; it forces a frame.
+  - Confirm that `.attachment-preview-wrapper` has a child before typing.
+  - Click New chat and Send with real clicks (`find`, then `left_click`), with a screenshot after each.
+- **One edit per fresh chat, in Pro mode.** Check the mode picker label says "currently Pro". Long chats drift the camera.
+- **Check alignment before exporting.** Downscale both images in an OffscreenCanvas and compare the mean difference. A zoom drift shows as roughly 5x the normal difference.
