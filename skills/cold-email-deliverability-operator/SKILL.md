@@ -221,6 +221,15 @@ You cannot see a recipient's folders, so test with mailboxes you control or a se
 Gmail-specific: Promotions is triggered more by layout (HTML, images, many links, unsubscribe
 footers) than by words. A short plain-text note with one or two links usually lands in Primary.
 
+**Check the links as received, not as written.** An API or connector in the sending path can rewrite
+links. Seen Nov 2026: the Claude Gmail connector (create_draft and send_message) turned every URL into
+`https://www.google.com/url?q=<url>&source=gmail&ust=…&sa=E`. That included plain text, bare domains
+and HTML `href`. Clicking one opens Google's "Redirect Notice" warning page first. mail-tester
+still scored 9.9/10 and the seed landed in Primary, so neither check catches this. Before a
+campaign, read one draft back in RAW (MIME) format, or open a seed copy and look at the actual link.
+If the links are rewritten, the owner sends any email containing links from the provider's own compose
+window.
+
 ---
 
 ## Gemini (Antigravity) Execution SOP
