@@ -46,6 +46,9 @@ description: Apply to affiliate networks (AvantLink, Impact, Amazon Associates, 
 - Payoneer asks Indian users for an IEC (Import Export Code). Its support said in writing (Nov 2026) that an individual
   receiving Amazon Associates commissions can ignore it: not mandatory, not reviewed, no effect on payments. Don't pay for one;
   ask support on a ticket first and keep the reply.
+  Payoneer tickets close automatically if you don't reply within 5 days, and a reply to a closed thread just bounces back
+  ("this inquiry thread has been closed"). If the Verification Center banner stays up after support says to ignore the IEC,
+  open a new request from inside the account (? icon > Contact us), quote the old reference, and answer each reply within 5 days.
 - No GST/company registration is needed to apply. In India: commissions are taxable business income
   (ITR-3/ITR-4 with 44ADA/44AD if eligible); keep FIRA/FIRC or bank advice for each foreign credit;
   PayPal India needs a purpose code (see `paypal-india-merchant-operator`). GST registration only above
